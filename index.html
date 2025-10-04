@@ -116,7 +116,7 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        .sync-button, .debug-toggle {
+        .sync-button, .debug-toggle, .auth-button {
             background: #444;
             color: #fff;
             border: none;
@@ -125,6 +125,7 @@
             cursor: pointer;
             margin-top: 10px;
         }
+        .auth-button { background: #4CAF50; }
         #debug {
             margin-top: 20px;
             color: #ff0;
@@ -167,6 +168,8 @@
     <div id="gamesContainer" class="games-grid"></div>
 
     <button class="sync-button" onclick="syncToClipboard()">Copiar Cambios al Portapapeles</button>
+    <button class="sync-button" id="syncToSheetsButton" onclick="syncToSheets()" disabled>Sincronizar con Google Sheets</button>
+    <button class="auth-button" id="authorizeButton" style="display:none;">Autorizar</button>
     <button class="debug-toggle" onclick="toggleDebug()">Mostrar Depuración</button>
     <div id="debug"></div>
 
@@ -240,22 +243,70 @@
         let allGames = [];
         let editIndex = -1;
         let debugEnabled = false;
+        let gapi = window.gapi;
+        let CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Reemplaza con tu client_id de Google Cloud Console
+        let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc';
+        let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+        let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg';
 
-        // Credenciales específicas
-        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Tu ID de hoja
-        const API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc'; // Nueva clave API
+        function onGapiLoad() {
+            console.log('gapi cargado correctamente');
+            document.getElementById('debug').innerHTML += '<br>gapi cargado correctamente.';
+            initClient();
+        }
 
-        // Cargar datos desde localStorage y Google Sheets con depuración
+        function onGapiError() {
+            console.error('Error al cargar gapi');
+            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi.';
+        }
+
+        function initClient() {
+            console.log('Iniciando cliente...');
+            document.getElementById('debug').innerHTML += '<br>Iniciando cliente...';
+            gapi.load('client:auth2', () => {
+                gapi.client.init({
+                    apiKey: API_KEY,
+                    clientId: CLIENT_ID,
+                    discoveryDocs: DISCOVERY_DOCS,
+                    scope: SCOPES
+                }).then(() => {
+                    console.log('Cliente inicializado');
+                    document.getElementById('debug').innerHTML += '<br>Cliente inicializado.';
+                    const authInstance = gapi.auth2.getAuthInstance();
+                    if (!authInstance.isSignedIn.get()) {
+                        document.getElementById('authorizeButton').style.display = 'block';
+                        document.getElementById('authorizeButton').onclick = handleAuthClick;
+                    } else {
+                        document.getElementById('syncToSheetsButton').disabled = false;
+                        loadData();
+                    }
+                }, error => {
+                    console.error('Error en initClient:', error);
+                    document.getElementById('debug').innerHTML += '<br>Error en initClient: ' + error.details;
+                });
+            });
+        }
+
+        function handleAuthClick() {
+            console.log('Iniciando autenticación...');
+            document.getElementById('debug').innerHTML += '<br>Iniciando autenticación...';
+            gapi.auth2.getAuthInstance().signIn().then(() => {
+                console.log('Autenticación exitosa');
+                document.getElementById('debug').innerHTML += '<br>Autenticación exitosa.';
+                document.getElementById('authorizeButton').style.display = 'none';
+                document.getElementById('syncToSheetsButton').disabled = false;
+                loadData();
+            }, error => {
+                console.error('Error en autenticación:', error);
+                document.getElementById('debug').innerHTML += '<br>Error en autenticación: ' + error.details;
+            });
+        }
+
+        // Cargar datos desde Google Sheets
         function loadData() {
             const debugDiv = document.getElementById('debug');
-            if (debugEnabled) debugDiv.innerHTML = 'Cargando datos...';
-            // Cargar desde localStorage primero
-            const savedData = localStorage.getItem('gameData');
-            if (savedData) {
-                data = JSON.parse(savedData);
-                if (debugEnabled) debugDiv.innerHTML += '<br>Datos cargados desde localStorage.';
-            }
-            // Cargar desde Google Sheets
+            if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos...';
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:F?key=${API_KEY}`)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -277,30 +328,54 @@
                                     img: img
                                 });
                                 if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
-                            } else {
-                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} inválida o incompleta: ${rows[i] || 'vacía'}`;
                             }
                         }
-                        // Guardar en localStorage después de cargar desde Sheets
                         localStorage.setItem('gameData', JSON.stringify(data));
                         if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados: ${rows.length - 1} filas procesadas.`;
                         updateDisplay();
                     } else {
-                        if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja. Usando datos de localStorage.';
-                        updateDisplay();
+                        if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
+                        const savedData = localStorage.getItem('gameData');
+                        if (savedData) {
+                            data = JSON.parse(savedData);
+                            updateDisplay();
+                        }
                     }
                 })
                 .catch(error => {
                     if (debugEnabled) debugDiv.innerHTML += `<br>Error al cargar datos: ${error.message}`;
                     console.error('Error details:', error);
-                    // Si falla la carga de Sheets, usar localStorage
+                    const savedData = localStorage.getItem('gameData');
                     if (savedData) {
                         data = JSON.parse(savedData);
                         updateDisplay();
-                    } else {
-                        if (debugEnabled) debugDiv.innerHTML += '<br>No hay datos en localStorage.';
                     }
                 });
+        }
+
+        // Sincronizar datos con Google Sheets
+        function syncToSheets() {
+            const debugDiv = document.getElementById('debug');
+            if (debugEnabled) debugDiv.innerHTML += '<br>Iniciando sincronización con Google Sheets...';
+            const values = [
+                ['Perfil', 'Título', 'Año', 'Plataforma', 'Puntaje', 'Imagen'],
+                ...Object.entries(data).flatMap(([profile, games]) =>
+                    games.map(game => [profile, game.titulo, game.año, game.plataforma, game.puntaje, game.img])
+                )
+            ];
+            gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: 'A1',
+                valueInputOption: 'RAW',
+                resource: { values: values }
+            }).then(response => {
+                if (debugEnabled) debugDiv.innerHTML += '<br>Sincronización exitosa.';
+                console.log('Sincronización exitosa:', response);
+                localStorage.setItem('gameData', JSON.stringify(data));
+            }, error => {
+                if (debugEnabled) debugDiv.innerHTML += '<br>Error en sincronización: ' + error.result.error.message;
+                console.error('Error en sincronización:', error);
+            });
         }
 
         // Actualizar la interfaz
@@ -317,7 +392,6 @@
         // Cargar datos cada 5 segundos
         setInterval(loadData, 5000);
 
-        // Inicializar al cargar
         window.onload = function() {
             loadData();
             loadProfile('main');
@@ -500,7 +574,7 @@
                 updateDisplay();
                 toggleForm('add');
                 document.getElementById('addForm').reset();
-                alert('Juego agregado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
+                alert('Juego agregado. Usa "Sincronizar con Google Sheets" para guardar permanentemente.');
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -522,7 +596,7 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('edit');
-                alert('Juego editado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
+                alert('Juego editado. Usa "Sincronizar con Google Sheets" para guardar permanentemente.');
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -533,7 +607,7 @@
                 data[currentProfile].splice(index, 1);
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
-                alert('Juego eliminado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
+                alert('Juego eliminado. Usa "Sincronizar con Google Sheets" para guardar permanentemente.');
             }
         }
 
@@ -563,5 +637,6 @@
             }
         }
     </script>
+    <script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" onerror="onGapiError()"></script>
 </body>
 </html>
