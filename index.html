@@ -128,7 +128,7 @@
         #debug {
             margin-top: 20px;
             color: #ff0;
-            display: none; /* Oculto por defecto */
+            display: none;
         }
         .debug-active #debug {
             display: block;
@@ -496,8 +496,8 @@
             if (titulo && año && plataforma && !isNaN(puntaje) && img) {
                 if (!data[currentProfile]) data[currentProfile] = [];
                 data[currentProfile].push({ titulo, año, plataforma, puntaje, img });
-                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
-                updateDisplay(); // Actualizar la interfaz inmediatamente
+                localStorage.setItem('gameData', JSON.stringify(data));
+                updateDisplay();
                 toggleForm('add');
                 document.getElementById('addForm').reset();
                 alert('Juego agregado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
@@ -519,8 +519,8 @@
 
             if (titulo && año && plataforma && !isNaN(puntaje) && img && editIndex >= 0) {
                 data[currentProfile][editIndex] = { titulo, año, plataforma, puntaje, img };
-                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
-                updateDisplay(); // Actualizar la interfaz inmediatamente
+                localStorage.setItem('gameData', JSON.stringify(data));
+                updateDisplay();
                 toggleForm('edit');
                 alert('Juego editado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
             } else {
@@ -531,8 +531,8 @@
         function deleteGame(index) {
             if (confirm('¿Estás seguro de eliminar este juego?')) {
                 data[currentProfile].splice(index, 1);
-                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
-                updateDisplay(); // Actualizar la interfaz inmediatamente
+                localStorage.setItem('gameData', JSON.stringify(data));
+                updateDisplay();
                 alert('Juego eliminado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
             }
         }
@@ -559,10 +559,9 @@
             if (!debugEnabled) {
                 document.getElementById('debug').innerHTML = '';
             } else {
-                loadData(); // Recargar datos para mostrar depuración
+                loadData();
             }
         }
     </script>
-    <script src="https://apis.google.com/js/api.js"></script>
 </body>
 </html>
