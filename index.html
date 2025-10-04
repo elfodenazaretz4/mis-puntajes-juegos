@@ -244,7 +244,7 @@
         let editIndex = -1;
         let debugEnabled = false;
         let gapi = window.gapi;
-        let CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Reemplaza con tu client_id de Google Cloud Console
+        let CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Tu client_id
         let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc';
         let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
         let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
@@ -467,7 +467,7 @@
             } else {
                 const allGamesData = [];
                 for (let profile in data) {
-                    data[profile].forEach(game => allGamesData.push(game));
+                    data[profile].forEach(game => allGamesData.push({ ...game, profile }));
                 }
                 filteredGames = allGamesData.filter(game => {
                     return (!selectedYear || game.año == selectedYear) &&
@@ -499,16 +499,17 @@
                 const allPuntajes = [];
                 for (let profile in data) {
                     const foundGame = data[profile].find(g => g.titulo === game.titulo && g.año === game.año && g.plataforma === game.plataforma);
-                    if (foundGame) allPuntajes.push(foundGame.puntaje);
+                    if (foundGame) allPuntajes.push({ profile, puntaje: foundGame.puntaje });
                 }
-                const promedio = allPuntajes.length > 1 ? (allPuntajes.reduce((a, b) => a + b) / allPuntajes.length).toFixed(2) : game.puntaje;
+                const puntajesText = allPuntajes.map(p => `${p.profile}: ${p.puntaje}`).join('<br>');
+                const promedio = allPuntajes.length > 0 ? (allPuntajes.reduce((a, b) => a + b.puntaje, 0) / allPuntajes.length).toFixed(2) : game.puntaje;
                 const card = document.createElement('div');
                 card.className = 'game-card';
                 card.innerHTML = `
                     <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
                     <h3>${game.titulo}</h3>
                     <p>${game.año} | ${game.plataforma}</p>
-                    <p>Puntaje: ${game.puntaje}</p>
+                    <p>Puntajes:<br>${puntajesText}</p>
                     <p>Promedio: ${promedio}</p>
                     <button class="edit-btn" onclick="editGame(${index})">Editar</button>
                     <button onclick="deleteGame(${index})">Eliminar</button>
@@ -524,29 +525,37 @@
                     data[profile].forEach(game => allGamesData.push({ ...game, profile }));
                 }
             }
-            let uniqueGames = [];
+            const uniqueGames = {};
             allGamesData.forEach(game => {
-                if (!uniqueGames.find(g => g.titulo === game.titulo && g.año === game.año && g.plataforma === game.plataforma) &&
-                    (!searchTerm || game.titulo.toLowerCase().includes(searchTerm))) {
-                    const allPuntajes = allGamesData.filter(g => g.titulo === game.titulo && g.año === game.año && g.plataforma === game.plataforma).map(g => g.puntaje);
-                    const promedio = allPuntajes.length > 1 ? (allPuntajes.reduce((a, b) => a + b) / allPuntajes.length).toFixed(2) : game.puntaje;
-                    uniqueGames.push({ ...game, promedio });
+                const key = `${game.titulo}-${game.año}-${game.plataforma}`;
+                if (!uniqueGames[key]) {
+                    uniqueGames[key] = { ...game, puntajes: [] };
                 }
+                uniqueGames[key].puntajes.push(game.puntaje);
             });
-            uniqueGames.sort((a, b) => parseFloat(b.promedio) - parseFloat(a.promedio) || b.puntaje - a.puntaje);
+
+            const gamesArray = Object.values(uniqueGames).filter(game =>
+                !searchTerm || game.titulo.toLowerCase().includes(searchTerm)
+            );
+            gamesArray.sort((a, b) => {
+                const avgA = a.puntajes.reduce((sum, p) => sum + p, 0) / a.puntajes.length;
+                const avgB = b.puntajes.reduce((sum, p) => sum + p, 0) / b.puntajes.length;
+                return avgB - avgA;
+            });
+
             const container = document.getElementById('mainGamesContainer');
             container.innerHTML = '';
-            uniqueGames.forEach(game => {
-                const puntajes = allGamesData.filter(g => g.titulo === game.titulo && g.año === game.año && g.plataforma === game.plataforma)
-                    .map(g => `${g.profile}: ${g.puntaje}`).join('<br>');
+            gamesArray.forEach(game => {
+                const puntajesText = game.puntajes.map((p, i) => `${Object.keys(data)[i % Object.keys(data).length]}: ${p}`).join('<br>');
+                const promedio = game.puntajes.reduce((sum, p) => sum + p, 0) / game.puntajes.length;
                 const card = document.createElement('div');
                 card.className = 'main-game-card';
                 card.innerHTML = `
                     <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
                     <h3>${game.titulo}</h3>
                     <p>${game.año} | ${game.plataforma}</p>
-                    <p>Puntajes: ${puntajes}</p>
-                    <p>Promedio: ${game.promedio}</p>
+                    <p>Puntajes:<br>${puntajesText}</p>
+                    <p>Promedio: ${promedio.toFixed(2)}</p>
                 `;
                 container.appendChild(card);
             });
