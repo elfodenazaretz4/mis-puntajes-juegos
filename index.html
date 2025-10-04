@@ -236,7 +236,7 @@
         <button onclick="toggleForm('edit')">Cancelar</button>
     </div>
 
-    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" onerror="onGapiError()"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         let data = {};
@@ -246,11 +246,22 @@
         let debugEnabled = false;
         let gapi = window.gapi;
         let CLIENT_ID = '';
-        let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc'; // Nueva clave integrada
+        let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc';
         let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
         let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
         const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg';
+
+        function onGapiLoad() {
+            console.log('gapi cargado correctamente');
+            document.getElementById('debug').innerHTML += '<br>gapi cargado correctamente.';
+            initClient();
+        }
+
+        function onGapiError() {
+            console.error('Error al cargar gapi');
+            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi.';
+        }
 
         function initClient() {
             console.log('Iniciando cliente...');
@@ -275,6 +286,11 @@
         function initAuth() {
             console.log('Iniciando autenticación...');
             document.getElementById('debug').innerHTML += '<br>Iniciando autenticación...';
+            if (!gapi || !gapi.client) {
+                console.error('gapi o gapi.client no están definidos');
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está disponible.';
+                return;
+            }
             gapi.client.init({
                 apiKey: API_KEY,
                 clientId: CLIENT_ID,
@@ -393,16 +409,7 @@
         setInterval(loadData, 5000);
 
         window.onload = function() {
-            initClient();
-            loadProfile('main');
-            // Forzar visibilidad del botón si no se autentica
-            setTimeout(() => {
-                if (!gapi.auth2.getAuthInstance() || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                    console.log('Forzando visibilidad del botón Autorizar');
-                    document.getElementById('debug').innerHTML += '<br>Forzando visibilidad del botón Autorizar.';
-                    document.getElementById('authorizeButton').style.display = 'block';
-                }
-            }, 2000);
+            // initClient se llama desde onGapiLoad
         };
 
         function loadProfile(profile) {
