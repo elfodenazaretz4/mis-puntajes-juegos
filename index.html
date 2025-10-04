@@ -116,7 +116,7 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        .sync-button, .debug-toggle, .auth-button {
+        .sync-button, .debug-toggle {
             background: #444;
             color: #fff;
             border: none;
@@ -125,11 +125,10 @@
             cursor: pointer;
             margin-top: 10px;
         }
-        .auth-button { background: #4CAF50; }
         #debug {
             margin-top: 20px;
             color: #ff0;
-            display: none;
+            display: none; /* Oculto por defecto */
         }
         .debug-active #debug {
             display: block;
@@ -169,7 +168,6 @@
 
     <button class="sync-button" onclick="syncToClipboard()">Copiar Cambios al Portapapeles</button>
     <button class="debug-toggle" onclick="toggleDebug()">Mostrar Depuración</button>
-    <button class="auth-button" id="authorizeButton" style="display:none;">Autorizar</button>
     <div id="debug"></div>
 
     <div id="addForm" class="add-form">
@@ -236,166 +234,74 @@
         <button onclick="toggleForm('edit')">Cancelar</button>
     </div>
 
-    <script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" onerror="onGapiError()"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         let data = {};
         let currentProfile = 'main';
         let allGames = [];
         let editIndex = -1;
         let debugEnabled = false;
-        let gapi = window.gapi;
-        let CLIENT_ID = '';
-        let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc';
-        let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
-        let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
-        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg';
+        // Credenciales específicas
+        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Tu ID de hoja
+        const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Tu clave API
 
-        function onGapiLoad() {
-            console.log('gapi cargado correctamente');
-            document.getElementById('debug').innerHTML += '<br>gapi cargado correctamente.';
-            initClient();
-        }
-
-        function onGapiError() {
-            console.error('Error al cargar gapi');
-            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi.';
-        }
-
-        function initClient() {
-            console.log('Iniciando cliente...');
-            document.getElementById('debug').innerHTML = 'Iniciando cliente...';
-            fetch('/client_secret.json', { mode: 'cors' })
+        // Cargar datos desde localStorage y Google Sheets con depuración opcional
+        function loadData() {
+            const debugDiv = document.getElementById('debug');
+            if (debugEnabled) debugDiv.innerHTML = 'Cargando datos...';
+            // Primero cargar desde localStorage
+            const savedData = localStorage.getItem('gameData');
+            if (savedData) {
+                data = JSON.parse(savedData);
+                if (debugEnabled) debugDiv.innerHTML += '<br>Datos cargados desde localStorage.';
+            }
+            // Luego intentar cargar desde Google Sheets
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:F?key=${API_KEY}`)
                 .then(response => {
-                    if (!response.ok) throw new Error('Fallo al cargar client_secret.json: ' + response.status);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return response.json();
                 })
-                .then(json => {
-                    CLIENT_ID = json.web.client_id;
-                    console.log('CLIENT_ID cargado:', CLIENT_ID);
-                    document.getElementById('debug').innerHTML += '<br>CLIENT_ID cargado.';
-                    gapi.load('client:auth2', initAuth);
+                .then(dataResponse => {
+                    const rows = dataResponse.values;
+                    if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
+                    if (rows && rows.length > 1) {
+                        data = { z4: [], shenqi: [], cayden: [] };
+                        for (let i = 1; i < rows.length; i++) {
+                            const [perfil, titulo, año, plataforma, puntaje, img] = rows[i] || [];
+                            if (perfil && titulo && año && plataforma && puntaje && img) {
+                                data[perfil.toLowerCase()].push({
+                                    titulo: titulo,
+                                    año: parseInt(año),
+                                    plataforma: plataforma,
+                                    puntaje: parseFloat(puntaje),
+                                    img: img
+                                });
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
+                            } else {
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} inválida o incompleta: ${rows[i] || 'vacía'}`;
+                            }
+                        }
+                        // Guardar en localStorage después de cargar desde Sheets
+                        localStorage.setItem('gameData', JSON.stringify(data));
+                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados: ${rows.length - 1} filas procesadas.`;
+                        updateDisplay();
+                    } else {
+                        if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja. Usando datos de localStorage.';
+                        updateDisplay();
+                    }
                 })
                 .catch(error => {
-                    console.error('Error en fetch:', error);
-                    document.getElementById('debug').innerHTML += '<br>Error al cargar client_secret.json: ' + error.message;
+                    if (debugEnabled) debugDiv.innerHTML = `Error al cargar datos: ${error.message}`;
+                    console.error('Error details:', error);
+                    // Si falla la carga de Sheets, usar localStorage
+                    if (savedData) {
+                        data = JSON.parse(savedData);
+                        updateDisplay();
+                    }
                 });
         }
 
-        function initAuth() {
-            console.log('Iniciando autenticación...');
-            document.getElementById('debug').innerHTML += '<br>Iniciando autenticación...';
-            if (!gapi || !gapi.client) {
-                console.error('gapi o gapi.client no están definidos');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está disponible.';
-                return;
-            }
-            gapi.client.init({
-                apiKey: API_KEY,
-                clientId: CLIENT_ID,
-                discoveryDocs: DISCOVERY_DOCS,
-                scope: SCOPES
-            }).then(() => {
-                console.log('Autenticación inicializada');
-                document.getElementById('debug').innerHTML += '<br>Autenticación inicializada.';
-                const authInstance = gapi.auth2.getAuthInstance();
-                if (!authInstance.isSignedIn.get()) {
-                    console.log('No autenticado, mostrando botón Autorizar');
-                    document.getElementById('debug').innerHTML += '<br>No autenticado, mostrando botón Autorizar.';
-                    document.getElementById('authorizeButton').style.display = 'block';
-                    document.getElementById('authorizeButton').onclick = handleAuthClick;
-                } else {
-                    console.log('Ya autenticado, cargando datos');
-                    document.getElementById('debug').innerHTML += '<br>Ya autenticado, cargando datos.';
-                    loadData();
-                }
-            }, error => {
-                console.error('Error en initAuth:', error);
-                document.getElementById('debug').innerHTML += '<br>Error en initAuth: ' + (error.details || error.message);
-            });
-        }
-
-        function handleAuthClick() {
-            console.log('Iniciando proceso de autorización...');
-            document.getElementById('debug').innerHTML += '<br>Iniciando proceso de autorización...';
-            gapi.auth2.getAuthInstance().signIn().then(() => {
-                console.log('Autorización exitosa');
-                document.getElementById('debug').innerHTML += '<br>Autorización exitosa.';
-                document.getElementById('authorizeButton').style.display = 'none';
-                loadData();
-            }, error => {
-                console.error('Error en autorización:', error);
-                document.getElementById('debug').innerHTML += '<br>Error al autorizar: ' + (error.details || error.message);
-            });
-        }
-
-        function loadData() {
-            const debugDiv = document.getElementById('debug');
-            if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos...';
-            console.log('Solicitando datos de la hoja:', SPREADSHEET_ID);
-            gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'A:F'
-            }).then(response => {
-                console.log('Respuesta de la API:', response);
-                const rows = response.result.values;
-                if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
-                if (rows && rows.length > 1) {
-                    data = { z4: [], shenqi: [], cayden: [] };
-                    for (let i = 1; i < rows.length; i++) {
-                        const [perfil, titulo, año, plataforma, puntaje, img] = rows[i] || [];
-                        if (perfil && titulo && año && plataforma && puntaje && img) {
-                            data[perfil.toLowerCase()].push({
-                                titulo: titulo,
-                                año: parseInt(año),
-                                plataforma: plataforma,
-                                puntaje: parseFloat(puntaje),
-                                img: img
-                            });
-                            if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
-                        } else {
-                            if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} inválida o incompleta: ${rows[i] || 'vacía'}`;
-                        }
-                    }
-                    localStorage.setItem('gameData', JSON.stringify(data));
-                    if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados: ${rows.length - 1} filas procesadas.`;
-                    updateDisplay();
-                } else {
-                    if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
-                }
-            }, error => {
-                console.error('Error en loadData:', error);
-                if (debugEnabled) debugDiv.innerHTML += '<br>Error al cargar datos: ' + (error.result ? error.result.error.message : error.message);
-                const savedData = localStorage.getItem('gameData');
-                if (savedData) {
-                    data = JSON.parse(savedData);
-                    updateDisplay();
-                }
-            });
-        }
-
-        function updateDataToSheet() {
-            const values = [
-                ['Perfil', 'Título', 'Año', 'Plataforma', 'Puntaje', 'Imagen'],
-                ...Object.entries(data).flatMap(([profile, games]) =>
-                    games.map(game => [profile, game.titulo, game.año, game.plataforma, game.puntaje, game.img])
-                )
-            ];
-            gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'A1',
-                valueInputOption: 'RAW',
-                resource: { values: values }
-            }).then(response => {
-                if (debugEnabled) document.getElementById('debug').innerHTML += '<br>Datos sincronizados con Google Sheets.';
-                localStorage.setItem('gameData', JSON.stringify(data));
-            }, error => {
-                console.error('Error en updateDataToSheet:', error);
-                if (debugEnabled) document.getElementById('debug').innerHTML += '<br>Error al sincronizar: ' + (error.result ? error.result.error.message : error.message);
-            });
-        }
-
+        // Actualizar la interfaz
         function updateDisplay() {
             if (currentProfile !== 'main') {
                 allGames = data[currentProfile] || [];
@@ -406,10 +312,13 @@
             }
         }
 
+        // Cargar datos cada 5 segundos
         setInterval(loadData, 5000);
 
+        // Inicializar al cargar
         window.onload = function() {
-            // initClient se llama desde onGapiLoad
+            loadData();
+            loadProfile('main');
         };
 
         function loadProfile(profile) {
@@ -418,7 +327,7 @@
                 document.getElementById('gamesContainer').style.display = 'none';
                 document.getElementById('mainGamesContainer').style.display = 'flex';
                 renderMainGames();
-                updateFiltersForMain();
+                updateFiltersForMain(); // Actualizar filtros para la vista principal
             } else {
                 document.getElementById('mainGamesContainer').style.display = 'none';
                 document.getElementById('gamesContainer').style.display = 'flex';
@@ -585,10 +494,11 @@
             if (titulo && año && plataforma && !isNaN(puntaje) && img) {
                 if (!data[currentProfile]) data[currentProfile] = [];
                 data[currentProfile].push({ titulo, año, plataforma, puntaje, img });
-                updateDataToSheet();
+                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
                 updateDisplay();
                 toggleForm('add');
                 document.getElementById('addForm').reset();
+                alert('Juego agregado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -607,9 +517,10 @@
 
             if (titulo && año && plataforma && !isNaN(puntaje) && img && editIndex >= 0) {
                 data[currentProfile][editIndex] = { titulo, año, plataforma, puntaje, img };
-                updateDataToSheet();
+                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
                 updateDisplay();
                 toggleForm('edit');
+                alert('Juego editado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -618,8 +529,9 @@
         function deleteGame(index) {
             if (confirm('¿Estás seguro de eliminar este juego?')) {
                 data[currentProfile].splice(index, 1);
-                updateDataToSheet();
+                localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage
                 updateDisplay();
+                alert('Juego eliminado. Sincroniza con Google Sheets si deseas guardarlo permanentemente.');
             }
         }
 
@@ -631,7 +543,7 @@
                 )
             ].map(row => row.join(',')).join('\n');
             navigator.clipboard.writeText(csvContent).then(() => {
-                alert('Datos copiados al portapapeles. Pégalos en Google Sheets si lo necesitas.');
+                alert('Datos copiados al portapapeles. Pégalos en Google Sheets (reemplaza la hoja).');
             }).catch(err => {
                 alert('Error al copiar: ' + err);
             });
@@ -645,10 +557,10 @@
             if (!debugEnabled) {
                 document.getElementById('debug').innerHTML = '';
             } else {
-                document.getElementById('debug').innerHTML = 'Depuración activada.';
-                loadData();
+                loadData(); // Recargar datos para mostrar depuración
             }
         }
     </script>
+    <script src="https://apis.google.com/js/api.js"></script>
 </body>
 </html>
