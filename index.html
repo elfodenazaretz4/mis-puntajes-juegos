@@ -19,8 +19,16 @@
         header h1:hover {
             color: #ccc;
         }
-        .profile-selector {
+        .controls {
+            position: sticky;
+            top: 20px;
+            background: #000;
+            z-index: 1000;
+            padding: 10px 0;
             margin-bottom: 20px;
+        }
+        .profile-selector {
+            margin-bottom: 10px;
         }
         .profile-selector button {
             background: #222;
@@ -35,7 +43,7 @@
             background: #444;
         }
         .search-bar {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             text-align: center;
         }
         .search-bar input {
@@ -47,7 +55,7 @@
             border-radius: 5px;
         }
         .filters {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             text-align: center;
         }
         .filters select {
@@ -134,6 +142,7 @@
         .debug-active #debug {
             display: block;
         }
+        strong { font-weight: bold; }
     </style>
 </head>
 <body>
@@ -141,30 +150,29 @@
         <h1>Mis Puntajes de Videojuegos</h1>
     </header>
 
+    <div class="controls">
+        <div class="profile-selector">
+            <button onclick="loadProfile('z4')">Z4</button>
+            <button onclick="loadProfile('shenqi')">Shenqi</button>
+            <button onclick="loadProfile('cayden')">Cayden</button>
+            <button onclick="toggleForm('add')">Agregar Juego</button>
+        </div>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Buscar por título..." onkeyup="applySearch()">
+        </div>
+        <div class="filters">
+            <label>Año:</label>
+            <select id="filterYear" onchange="applyFiltersAndSearch()">
+                <option value="">Selecciona Año</option>
+            </select>
+            <label>Plataforma:</label>
+            <select id="filterPlatform" onchange="applyFiltersAndSearch()">
+                <option value="">Selecciona Plataforma</option>
+            </select>
+        </div>
+    </div>
+
     <div id="mainGamesContainer" class="main-games-grid"></div>
-
-    <div class="profile-selector">
-        <button onclick="loadProfile('z4')">Z4</button>
-        <button onclick="loadProfile('shenqi')">Shenqi</button>
-        <button onclick="loadProfile('cayden')">Cayden</button>
-        <button onclick="toggleForm('add')">Agregar Juego</button>
-    </div>
-
-    <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="Buscar por título..." onkeyup="applySearch()">
-    </div>
-
-    <div class="filters">
-        <label>Año:</label>
-        <select id="filterYear" onchange="applyFiltersAndSearch()">
-            <option value="">Selecciona Año</option>
-        </select>
-        <label>Plataforma:</label>
-        <select id="filterPlatform" onchange="applyFiltersAndSearch()">
-            <option value="">Selecciona Plataforma</option>
-        </select>
-    </div>
-
     <div id="gamesContainer" class="games-grid"></div>
 
     <button class="sync-button" onclick="syncToClipboard()">Copiar Cambios al Portapapeles</button>
@@ -502,7 +510,7 @@
                     if (foundGame) allPuntajes.push({ profile, puntaje: foundGame.puntaje });
                 }
                 const puntajesText = allPuntajes.map(p => `${p.profile}: ${p.puntaje}`).join('<br>');
-                const promedio = allPuntajes.length > 0 ? (allPuntajes.reduce((a, b) => a + b.puntaje, 0) / allPuntajes.length).toFixed(2) : game.puntaje;
+                const currentProfilePuntaje = game.puntaje; // Puntaje del perfil actual
                 const card = document.createElement('div');
                 card.className = 'game-card';
                 card.innerHTML = `
@@ -510,7 +518,8 @@
                     <h3>${game.titulo}</h3>
                     <p>${game.año} | ${game.plataforma}</p>
                     <p>Puntajes:<br>${puntajesText}</p>
-                    <p>Promedio: ${promedio}</p>
+                    <p>Promedio: ${(allPuntajes.length > 0 ? (allPuntajes.reduce((a, b) => a + b.puntaje, 0) / allPuntajes.length).toFixed(2) : game.puntaje)}</p>
+                    <p><strong>Puntaje (${currentProfile}): ${currentProfilePuntaje}</strong></p>
                     <button class="edit-btn" onclick="editGame(${index})">Editar</button>
                     <button onclick="deleteGame(${index})">Eliminar</button>
                 `;
@@ -529,9 +538,10 @@
             allGamesData.forEach(game => {
                 const key = `${game.titulo}-${game.año}-${game.plataforma}`;
                 if (!uniqueGames[key]) {
-                    uniqueGames[key] = { ...game, puntajes: [] };
+                    uniqueGames[key] = { ...game, puntajes: [], profiles: [] };
                 }
                 uniqueGames[key].puntajes.push(game.puntaje);
+                uniqueGames[key].profiles.push(game.profile);
             });
 
             const gamesArray = Object.values(uniqueGames).filter(game =>
@@ -546,7 +556,7 @@
             const container = document.getElementById('mainGamesContainer');
             container.innerHTML = '';
             gamesArray.forEach(game => {
-                const puntajesText = game.puntajes.map((p, i) => `${Object.keys(data)[i % Object.keys(data).length]}: ${p}`).join('<br>');
+                const puntajesText = game.puntajes.map((p, i) => `${game.profiles[i]}: ${p}`).join('<br>');
                 const promedio = game.puntajes.reduce((sum, p) => sum + p, 0) / game.puntajes.length;
                 const card = document.createElement('div');
                 card.className = 'main-game-card';
@@ -555,7 +565,7 @@
                     <h3>${game.titulo}</h3>
                     <p>${game.año} | ${game.plataforma}</p>
                     <p>Puntajes:<br>${puntajesText}</p>
-                    <p>Promedio: ${promedio.toFixed(2)}</p>
+                    <p>Promedio: <strong>${promedio.toFixed(2)}</strong></p>
                 `;
                 container.appendChild(card);
             });
