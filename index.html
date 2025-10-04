@@ -321,7 +321,6 @@
                     updateDisplay();
                 } else {
                     if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
-                    updateDisplay();
                 }
             }, error => {
                 if (debugEnabled) debugDiv.innerHTML = 'Error al cargar datos: ' + error.result.error.message;
@@ -606,9 +605,13 @@
                 loadData();
             }
         }
+
+        // Asegúrate de que el botón de autorización aparezca si no está autenticado
+        setTimeout(() => {
+            if (!gapi.auth2.getAuthInstance() || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                document.getElementById('authorizeButton').style.display = 'block';
+            }
+        }, 1000);
     </script>
 </body>
 </html>
-
-</html>
-
