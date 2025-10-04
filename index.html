@@ -246,57 +246,83 @@
         let debugEnabled = false;
         let gapi = window.gapi;
         let CLIENT_ID = '';
-        let API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E';
+        let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc'; // Nueva clave integrada
         let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
         let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
         const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg';
 
         function initClient() {
-            fetch('/client_secret.json')
-                .then(response => response.json())
+            console.log('Iniciando cliente...');
+            document.getElementById('debug').innerHTML = 'Iniciando cliente...';
+            fetch('/client_secret.json', { mode: 'cors' })
+                .then(response => {
+                    if (!response.ok) throw new Error('Fallo al cargar client_secret.json: ' + response.status);
+                    return response.json();
+                })
                 .then(json => {
                     CLIENT_ID = json.web.client_id;
+                    console.log('CLIENT_ID cargado:', CLIENT_ID);
+                    document.getElementById('debug').innerHTML += '<br>CLIENT_ID cargado.';
                     gapi.load('client:auth2', initAuth);
                 })
                 .catch(error => {
-                    document.getElementById('debug').innerHTML = 'Error al cargar client_secret.json: ' + error;
+                    console.error('Error en fetch:', error);
+                    document.getElementById('debug').innerHTML += '<br>Error al cargar client_secret.json: ' + error.message;
                 });
         }
 
         function initAuth() {
+            console.log('Iniciando autenticación...');
+            document.getElementById('debug').innerHTML += '<br>Iniciando autenticación...';
             gapi.client.init({
                 apiKey: API_KEY,
                 clientId: CLIENT_ID,
                 discoveryDocs: DISCOVERY_DOCS,
                 scope: SCOPES
             }).then(() => {
+                console.log('Autenticación inicializada');
+                document.getElementById('debug').innerHTML += '<br>Autenticación inicializada.';
                 const authInstance = gapi.auth2.getAuthInstance();
                 if (!authInstance.isSignedIn.get()) {
+                    console.log('No autenticado, mostrando botón Autorizar');
+                    document.getElementById('debug').innerHTML += '<br>No autenticado, mostrando botón Autorizar.';
                     document.getElementById('authorizeButton').style.display = 'block';
                     document.getElementById('authorizeButton').onclick = handleAuthClick;
                 } else {
+                    console.log('Ya autenticado, cargando datos');
+                    document.getElementById('debug').innerHTML += '<br>Ya autenticado, cargando datos.';
                     loadData();
                 }
             }, error => {
-                document.getElementById('debug').innerHTML = 'Error en initAuth: ' + error;
+                console.error('Error en initAuth:', error);
+                document.getElementById('debug').innerHTML += '<br>Error en initAuth: ' + (error.details || error.message);
             });
         }
 
         function handleAuthClick() {
+            console.log('Iniciando proceso de autorización...');
+            document.getElementById('debug').innerHTML += '<br>Iniciando proceso de autorización...';
             gapi.auth2.getAuthInstance().signIn().then(() => {
+                console.log('Autorización exitosa');
+                document.getElementById('debug').innerHTML += '<br>Autorización exitosa.';
                 document.getElementById('authorizeButton').style.display = 'none';
                 loadData();
+            }, error => {
+                console.error('Error en autorización:', error);
+                document.getElementById('debug').innerHTML += '<br>Error al autorizar: ' + (error.details || error.message);
             });
         }
 
         function loadData() {
             const debugDiv = document.getElementById('debug');
-            if (debugEnabled) debugDiv.innerHTML = 'Cargando datos...';
+            if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos...';
+            console.log('Solicitando datos de la hoja:', SPREADSHEET_ID);
             gapi.client.sheets.spreadsheets.values.get({
                 spreadsheetId: SPREADSHEET_ID,
                 range: 'A:F'
             }).then(response => {
+                console.log('Respuesta de la API:', response);
                 const rows = response.result.values;
                 if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
                 if (rows && rows.length > 1) {
@@ -323,7 +349,8 @@
                     if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
                 }
             }, error => {
-                if (debugEnabled) debugDiv.innerHTML = 'Error al cargar datos: ' + error.result.error.message;
+                console.error('Error en loadData:', error);
+                if (debugEnabled) debugDiv.innerHTML += '<br>Error al cargar datos: ' + (error.result ? error.result.error.message : error.message);
                 const savedData = localStorage.getItem('gameData');
                 if (savedData) {
                     data = JSON.parse(savedData);
@@ -348,7 +375,8 @@
                 if (debugEnabled) document.getElementById('debug').innerHTML += '<br>Datos sincronizados con Google Sheets.';
                 localStorage.setItem('gameData', JSON.stringify(data));
             }, error => {
-                if (debugEnabled) document.getElementById('debug').innerHTML += '<br>Error al sincronizar: ' + error.result.error.message;
+                console.error('Error en updateDataToSheet:', error);
+                if (debugEnabled) document.getElementById('debug').innerHTML += '<br>Error al sincronizar: ' + (error.result ? error.result.error.message : error.message);
             });
         }
 
@@ -367,6 +395,14 @@
         window.onload = function() {
             initClient();
             loadProfile('main');
+            // Forzar visibilidad del botón si no se autentica
+            setTimeout(() => {
+                if (!gapi.auth2.getAuthInstance() || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                    console.log('Forzando visibilidad del botón Autorizar');
+                    document.getElementById('debug').innerHTML += '<br>Forzando visibilidad del botón Autorizar.';
+                    document.getElementById('authorizeButton').style.display = 'block';
+                }
+            }, 2000);
         };
 
         function loadProfile(profile) {
@@ -602,16 +638,10 @@
             if (!debugEnabled) {
                 document.getElementById('debug').innerHTML = '';
             } else {
+                document.getElementById('debug').innerHTML = 'Depuración activada.';
                 loadData();
             }
         }
-
-        // Asegúrate de que el botón de autorización aparezca si no está autenticado
-        setTimeout(() => {
-            if (!gapi.auth2.getAuthInstance() || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                document.getElementById('authorizeButton').style.display = 'block';
-            }
-        }, 1000);
     </script>
 </body>
 </html>
