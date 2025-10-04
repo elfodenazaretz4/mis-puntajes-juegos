@@ -313,51 +313,49 @@
             });
         }
 
-        // Cargar datos desde Google Sheets o localStorage
+        // Cargar datos desde Google Sheets
         function loadData() {
             const debugDiv = document.getElementById('debug');
             if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos...';
-            const savedData = localStorage.getItem('gameData');
-            if (savedData) {
-                data = JSON.parse(savedData);
-                if (debugEnabled) debugDiv.innerHTML += '<br>Datos cargados desde localStorage.';
-                updateDisplay();
-            } else {
-                fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:F?key=${API_KEY}`)
-                    .then(response => {
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                        return response.json();
-                    })
-                    .then(dataResponse => {
-                        const rows = dataResponse.values;
-                        if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
-                        if (rows && rows.length > 1) {
-                            data = { z4: [], shenqi: [], cayden: [] };
-                            for (let i = 1; i < rows.length; i++) {
-                                const [perfil, titulo, año, plataforma, puntaje, img] = rows[i] || [];
-                                if (perfil && titulo && año && plataforma && puntaje && img) {
-                                    data[perfil.toLowerCase()].push({
-                                        titulo: titulo,
-                                        año: parseInt(año),
-                                        plataforma: plataforma,
-                                        puntaje: parseFloat(puntaje),
-                                        img: img
-                                    });
-                                    if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
-                                }
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:F?key=${API_KEY}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(dataResponse => {
+                    const rows = dataResponse.values;
+                    if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
+                    if (rows && rows.length > 1) {
+                        data = { z4: [], shenqi: [], cayden: [] };
+                        for (let i = 1; i < rows.length; i++) {
+                            const [perfil, titulo, año, plataforma, puntaje, img] = rows[i] || [];
+                            if (perfil && titulo && año && plataforma && puntaje && img) {
+                                data[perfil.toLowerCase()].push({
+                                    titulo: titulo,
+                                    año: parseInt(año),
+                                    plataforma: plataforma,
+                                    puntaje: parseFloat(puntaje),
+                                    img: img
+                                });
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
                             }
-                            localStorage.setItem('gameData', JSON.stringify(data));
-                            if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados desde Google Sheets: ${rows.length - 1} filas procesadas.`;
-                            updateDisplay();
-                        } else {
-                            if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
                         }
-                    })
-                    .catch(error => {
-                        if (debugEnabled) debugDiv.innerHTML += `<br>Error al cargar datos: ${error.message}`;
-                        console.error('Error details:', error);
-                    });
-            }
+                        localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage como respaldo
+                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados desde Google Sheets: ${rows.length - 1} filas procesadas.`;
+                        updateDisplay();
+                    } else {
+                        if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
+                    }
+                })
+                .catch(error => {
+                    if (debugEnabled) debugDiv.innerHTML += `<br>Error al cargar datos: ${error.message}`;
+                    console.error('Error details:', error);
+                    const savedData = localStorage.getItem('gameData');
+                    if (savedData) {
+                        data = JSON.parse(savedData);
+                        updateDisplay();
+                    }
+                });
         }
 
         // Sincronizar datos con Google Sheets
@@ -378,13 +376,23 @@
             }).then(response => {
                 if (debugEnabled) debugDiv.innerHTML += '<br>Sincronización exitosa.';
                 console.log('Sincronización exitosa:', response);
-                localStorage.setItem('gameData', JSON.stringify(data)); // Asegura que localStorage esté actualizado
+                localStorage.setItem('gameData', JSON.stringify(data)); // Actualizar localStorage
                 alert('Datos sincronizados con Google Sheets.');
             }, error => {
                 if (debugEnabled) debugDiv.innerHTML += '<br>Error en sincronización: ' + error.result.error.message;
                 console.error('Error en sincronización:', error);
                 alert('Error al sincronizar. Revisa la consola o depuración.');
             });
+        }
+
+        // Sincronización automática tras cambios
+        function autoSync() {
+            const authInstance = gapi.auth2.getAuthInstance();
+            if (authInstance && authInstance.isSignedIn.get()) {
+                syncToSheets();
+            } else {
+                alert('Debes autorizar la aplicación para sincronizar automáticamente.');
+            }
         }
 
         // Actualizar la interfaz
@@ -397,9 +405,6 @@
                 renderMainGames();
             }
         }
-
-        // Eliminar recarga automática
-        // setInterval(loadData, 5000); // Comentado para evitar sobrescritura
 
         window.onload = function() {
             loadData();
@@ -584,7 +589,7 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('add');
-                alert('Juego agregado. Sincroniza con Google Sheets para guardarlo permanentemente.');
+                autoSync(); // Sincronizar automáticamente
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -606,7 +611,7 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('edit');
-                alert('Juego editado. Sincroniza con Google Sheets para guardarlo permanentemente.');
+                autoSync(); // Sincronizar automáticamente
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -617,7 +622,7 @@
                 data[currentProfile].splice(index, 1);
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
-                alert('Juego eliminado. Sincroniza con Google Sheets para guardarlo permanentemente.');
+                autoSync(); // Sincronizar automáticamente
             }
         }
 
