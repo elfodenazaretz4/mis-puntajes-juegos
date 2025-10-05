@@ -205,7 +205,7 @@
     <div id="debug"></div>
 
     <!-- Reproductor Spotify -->
-    <iframe id="spotify-player" src="https://open.spotify.com/embed/playlist/0TpzNzSzM0jXtaACgGlloQ?theme=0&autoplay=1" width="300" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <iframe id="spotify-player" src="https://open.spotify.com/embed/playlist/0TpzNzSzM0jXtaACgGlloQ?theme=0" width="300" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
 
     <form id="addForm" class="add-form">
         <h3>Agregar Nuevo Juego</h3>
@@ -304,14 +304,11 @@
             return data.access_token;
         }
 
-        // Iniciar reproductor Spotify
+        // Iniciar reproductor Spotify usando el SDK
         async function playSpotify() {
             token = await getToken();
             const playerElement = document.getElementById('spotify-player');
             playerElement.style.display = 'block';
-            playerElement.contentWindow.postMessage({
-                command: 'play'
-            }, 'https://open.spotify.com');
 
             if (window.Spotify) {
                 window.onSpotifyWebPlaybackSDKReady = () => {
@@ -320,8 +317,10 @@
                         getOAuthToken: cb => { cb(token); }
                     });
 
+                    // Manejar evento cuando el dispositivo está listo
                     player.addListener('ready', ({ device_id }) => {
                         console.log('Dispositivo listo:', device_id);
+                        // Iniciar reproducción de la playlist
                         fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device_id}`, {
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${token}` },
@@ -331,6 +330,7 @@
                         }).catch(err => console.error('Error al reproducir:', err));
                     });
 
+                    // Actualizar el cartelito con la canción actual
                     player.addListener('player_state_changed', state => {
                         if (!state) return;
                         const track = state.track_window.current_track;
@@ -345,10 +345,17 @@
                         document.getElementById('current-progress').textContent = `Progreso: <strong>${progressMin}:${progressSec.toString().padStart(2, '0')} / ${durationMin}:${durationSec.toString().padStart(2, '0')}</strong>`;
                     });
 
+                    // Conectar al reproductor
                     player.connect().then(success => {
-                        if (success) console.log('Conectado al reproductor');
+                        if (success) {
+                            console.log('Conectado al reproductor');
+                        } else {
+                            console.error('Fallo al conectar al reproductor');
+                        }
                     });
                 };
+
+                // Cargar el SDK de Spotify
                 const script = document.createElement('script');
                 script.src = 'https://sdk.scdn.co/spotify-player.js';
                 document.body.appendChild(script);
@@ -356,6 +363,7 @@
                 document.getElementById('current-song').textContent = 'Reproduciendo: <strong>Lista de Spotify</strong>';
                 document.getElementById('current-artist').textContent = 'Artista: <strong>Cargando...</strong>';
                 document.getElementById('current-progress').textContent = 'Progreso: <strong>0:00 / 0:00</strong>';
+                console.error('Spotify Web Playback SDK no está disponible');
             }
         }
 
@@ -365,8 +373,8 @@
             if (typeof gapi !== 'undefined' && gapi) {
                 initClient();
             } else {
-                console.error('gapi no está definido');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido.';
+                console.error('gapi no está definido después de cargar');
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido después de cargar.';
             }
         }
 
