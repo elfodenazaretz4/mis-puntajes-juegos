@@ -66,12 +66,12 @@
             margin: 0 10px;
             border-radius: 5px;
         }
-        .games-grid, .main-games-grid {
+        .games-grid, .main-games-grid, .must-play-grid {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
         }
-        .game-card, .main-game-card {
+        .game-card, .main-game-card, .must-play-card {
             background: #222;
             border-radius: 10px;
             padding: 10px;
@@ -81,7 +81,7 @@
             vertical-align: top;
             position: relative;
         }
-        .game-card img, .main-game-card img {
+        .game-card img, .main-game-card img, .must-play-card img {
             width: 100%;
             border-radius: 5px;
         }
@@ -95,20 +95,20 @@
             margin: 2px;
         }
         .game-card .edit-btn { background: #060; }
-        .main-game-card button { display: none; }
+        .main-game-card button, .must-play-card button { display: none; }
         h3 { margin: 10px 0 5px 0; }
         p { margin: 5px 0; font-size: 0.9em; }
-        .add-form, .edit-form {
+        .add-form, .edit-form, .must-play-form {
             background: #222;
             padding: 20px;
             border-radius: 10px;
             margin: 10px 0;
             display: none;
         }
-        .add-form.active, .edit-form.active {
+        .add-form.active, .edit-form.active, .must-play-form.active {
             display: block;
         }
-        .add-form input, .add-form select, .edit-form input, .edit-form select {
+        .add-form input, .add-form select, .edit-form input, .edit-form select, .must-play-form input, .must-play-form select {
             background: #333;
             color: #fff;
             border: 1px solid #444;
@@ -118,7 +118,7 @@
             width: 100%;
             box-sizing: border-box;
         }
-        .add-form button, .edit-form button {
+        .add-form button, .edit-form button, .must-play-form button {
             background: #444;
             color: #fff;
             border: none;
@@ -143,6 +143,26 @@
             display: none;
         }
         .debug-active #debug {
+            display: block;
+        }
+        .must-play-controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .must-play-controls select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+        .lucky-game {
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .lucky-game.active {
             display: block;
         }
     </style>
@@ -241,8 +261,52 @@
     </form>
 
     <button class="sync-button" onclick="syncToClipboard()">Copiar Cambios al Portapapeles</button>
-    <button class="sync-button" id="syncToSheetsButton" onclick="syncToSheets()" disabled>Sincronizar con Google Sheets</button>
-    <button class="auth-button" id="authorizeButton" style="display:none;">Autorizar</button>
+
+    <button class="sync-button" onclick="loadMustPlay()">Lista Cronológica Must Play</button>
+    <div id="mustPlayContainer" class="must-play-grid" style="display:none;">
+        <div class="must-play-controls">
+            <label>Orden:</label>
+            <select id="sortOrder" onchange="applyMustPlayFilters()">
+                <option value="asc">Más antiguo al más nuevo</option>
+                <option value="desc">Más nuevo al más antiguo</option>
+            </select>
+        </div>
+        <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+        <div id="luckyGame" class="lucky-game"></div>
+    </div>
+
+    <form id="mustPlayForm" class="must-play-form">
+        <h3>Agregar Juego Must Play</h3>
+        <input type="text" id="mustPlayTitle" placeholder="Título" required>
+        <input type="number" id="mustPlayYear" placeholder="Año" min="1900" max="2025" required>
+        <input type="text" id="mustPlayDeveloper" placeholder="Desarrolladora" required>
+        <select id="mustPlayPlatform" required>
+            <option value="">Selecciona Plataforma</option>
+            <option value="PC">PC</option>
+            <option value="Wii">Wii</option>
+            <option value="Switch">Switch</option>
+            <option value="PS3">PS3</option>
+            <option value="PS4">PS4</option>
+            <option value="PS5">PS5</option>
+            <option value="Xbox">Xbox</option>
+            <option value="Xbox 360">Xbox 360</option>
+            <option value="Xbox One">Xbox One</option>
+            <option value="Xbox Series X">Xbox Series X</option>
+            <option value="GameCube">GameCube</option>
+            <option value="NES">NES</option>
+            <option value="SNES">SNES</option>
+            <option value="N64">N64</option>
+            <option value="Game Boy">Game Boy</option>
+            <option value="DS">DS</option>
+            <option value="3DS">3DS</option>
+            <option value="PSP">PSP</option>
+            <option value="Vita">Vita</option>
+        </select>
+        <input type="text" id="mustPlayImage" placeholder="URL de Imagen (ej. https://ejemplo.com/imagen.jpg)" required>
+        <button type="button" onclick="addMustPlayGame()">Guardar</button>
+        <button type="button" onclick="toggleForm('must-play')">Cancelar</button>
+    </form>
+
     <button class="debug-toggle" onclick="toggleDebug()">Mostrar Depuración</button>
     <div id="debug"></div>
 
@@ -252,13 +316,10 @@
         let allGames = [];
         let editIndex = -1;
         let debugEnabled = false;
-        let gapiLoaded = false;
+        let mustPlayData = [];
 
         // Configuración de Google Sheets
         const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Tu clave API
-        const CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Tu client_id
-        const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
-        const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
         const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Tu ID de hoja
 
         // Cargar datos desde Google Sheets
@@ -305,110 +366,43 @@
                 });
         }
 
-        // Inicializar cliente de Google API con reintento
-        function initClient() {
-            if (!window.gapi) {
-                console.error('gapi no está definido');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Intentando recargar...';
-                setTimeout(() => {
-                    const script = document.createElement('script');
-                    script.src = 'https://apis.google.com/js/api.js';
-                    script.onload = onGapiLoad;
-                    script.onerror = onGapiError;
-                    document.body.appendChild(script);
-                }, 2000); // Reintento después de 2 segundos
-                return;
-            }
-            gapi.load('client:auth2', () => {
-                gapi.client.init({
-                    apiKey: API_KEY,
-                    clientId: CLIENT_ID,
-                    discoveryDocs: DISCOVERY_DOCS,
-                    scope: SCOPES
-                }).then(() => {
-                    gapiLoaded = true;
-                    const authInstance = gapi.auth2.getAuthInstance();
-                    if (authInstance && !authInstance.isSignedIn.get()) {
-                        document.getElementById('authorizeButton').style.display = 'block';
-                        document.getElementById('authorizeButton').onclick = handleAuthClick;
-                    } else if (authInstance) {
-                        document.getElementById('syncToSheetsButton').disabled = false;
-                        loadData();
+        // Cargar datos Must Play desde Google Sheets
+        function loadMustPlayData() {
+            const debugDiv = document.getElementById('debug');
+            if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos Must Play...';
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/G:K?key=${API_KEY}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(dataResponse => {
+                    const rows = dataResponse.values;
+                    if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta Must Play recibida: ' + JSON.stringify(rows);
+                    if (rows && rows.length > 1) {
+                        mustPlayData = [];
+                        for (let i = 1; i < rows.length; i++) {
+                            const [titulo, año, desarrolladora, plataforma, img] = rows[i] || [];
+                            if (titulo && año && desarrolladora && plataforma && img) {
+                                mustPlayData.push({
+                                    titulo: titulo,
+                                    año: parseInt(año),
+                                    desarrolladora: desarrolladora,
+                                    plataforma: plataforma,
+                                    img: img
+                                });
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila Must Play ${i + 1} procesada: ${titulo}, ${año}, ${desarrolladora}, ${plataforma}, ${img}`;
+                            }
+                        }
+                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos Must Play cargados: ${rows.length - 1} filas procesadas.`;
+                        applyMustPlayFilters();
+                    } else {
+                        if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en Must Play.';
                     }
-                }, error => {
-                    console.error('Error en initClient:', error);
-                    document.getElementById('debug').innerHTML += '<br>Error en initClient: ' + JSON.stringify(error);
+                })
+                .catch(error => {
+                    if (debugEnabled) debugDiv.innerHTML = `Error al cargar datos Must Play: ${error.message}`;
+                    console.error('Error details:', error);
                 });
-            });
-        }
-
-        // Manejar autenticación
-        function handleAuthClick() {
-            const authInstance = gapi.auth2.getAuthInstance();
-            if (authInstance) {
-                authInstance.signIn().then(() => {
-                    document.getElementById('authorizeButton').style.display = 'none';
-                    document.getElementById('syncToSheetsButton').disabled = false;
-                    loadData();
-                }, error => {
-                    console.error('Error en autenticación:', error);
-                    document.getElementById('debug').innerHTML += '<br>Error en autenticación: ' + error.details;
-                });
-            } else {
-                document.getElementById('debug').innerHTML += '<br>Error: authInstance no está inicializado.';
-            }
-        }
-
-        // Cargar gapi
-        function onGapiLoad() {
-            if (window.gapi) {
-                gapi = window.gapi;
-                initClient();
-            } else {
-                console.error('gapi no está definido después de recargar');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido después de recargar. Verifica tu conexión.';
-            }
-        }
-
-        function onGapiError() {
-            console.error('Error al cargar gapi');
-            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi. Verifica tu conexión o las credenciales en Google Cloud.';
-        }
-
-        // Sincronizar con Google Sheets
-        function syncToSheets() {
-            if (!gapiLoaded || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                alert('Debes autorizar la aplicación para sincronizar.');
-                return;
-            }
-            const values = [
-                ['Perfil', 'Título', 'Año', 'Plataforma', 'Puntaje', 'Imagen'],
-                ...Object.entries(data).flatMap(([profile, games]) =>
-                    games.map(game => [profile, game.titulo, game.año, game.plataforma, game.puntaje, game.img])
-                )
-            ];
-            gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: 'A1',
-                valueInputOption: 'RAW',
-                resource: { values: values }
-            }).then(response => {
-                console.log('Sincronización exitosa:', response);
-                localStorage.setItem('gameData', JSON.stringify(data));
-                alert('Datos sincronizados con Google Sheets.');
-            }, error => {
-                console.error('Error en sincronización:', error);
-                alert('Error al sincronizar. Revisa la consola o depuración: ' + (error.result ? error.result.error.message : error.message));
-            });
-        }
-
-        // Sincronización automática
-        function autoSync() {
-            if (gapiLoaded && gapi.auth2.getAuthInstance() && gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                syncToSheets();
-            } else {
-                alert('Debes autorizar la aplicación para sincronizar automáticamente.');
-            }
         }
 
         // Actualizar pantalla
@@ -587,8 +581,10 @@
         function toggleForm(formType, index = -1) {
             const addForm = document.getElementById('addForm');
             const editForm = document.getElementById('editForm');
+            const mustPlayForm = document.getElementById('mustPlayForm');
             addForm.classList.remove('active');
             editForm.classList.remove('active');
+            mustPlayForm.classList.remove('active');
             if (formType === 'add') {
                 addForm.classList.add('active');
                 addForm.reset();
@@ -601,6 +597,9 @@
                 document.getElementById('editGamePlatform').value = game.plataforma;
                 document.getElementById('editGamePuntaje').value = game.puntaje;
                 document.getElementById('editGameImage').value = game.img;
+            } else if (formType === 'must-play') {
+                mustPlayForm.classList.add('active');
+                mustPlayForm.reset();
             }
         }
 
@@ -617,7 +616,6 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('add');
-                autoSync();
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -639,7 +637,6 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('edit');
-                autoSync();
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -650,7 +647,6 @@
                 data[currentProfile].splice(index, 1);
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
-                autoSync();
             }
         }
 
@@ -668,6 +664,82 @@
             });
         }
 
+        function loadMustPlay() {
+            loadMustPlayData();
+            const container = document.getElementById('mustPlayContainer');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            if (container.style.display === 'block') {
+                applyMustPlayFilters();
+            }
+        }
+
+        function applyMustPlayFilters() {
+            const sortOrder = document.getElementById('sortOrder').value;
+            let sortedGames = [...mustPlayData];
+            sortedGames.sort((a, b) => sortOrder === 'asc' ? a.año - b.año : b.año - a.año);
+            renderMustPlayGames(sortedGames);
+        }
+
+        function renderMustPlayGames(games) {
+            const container = document.getElementById('mustPlayContainer');
+            let html = `
+                <div class="must-play-controls">
+                    <label>Orden:</label>
+                    <select id="sortOrder" onchange="applyMustPlayFilters()">
+                        <option value="asc">Más antiguo al más nuevo</option>
+                        <option value="desc">Más nuevo al más antiguo</option>
+                    </select>
+                </div>
+                <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+            `;
+            games.forEach(game => {
+                html += `
+                    <div class="must-play-card">
+                        <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
+                        <h3>${game.titulo}</h3>
+                        <p>${game.año} | ${game.plataforma}</p>
+                        <p>Desarrolladora: ${game.desarrolladora}</p>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function addMustPlayGame() {
+            const titulo = document.getElementById('mustPlayTitle').value;
+            const año = parseInt(document.getElementById('mustPlayYear').value);
+            const desarrolladora = document.getElementById('mustPlayDeveloper').value;
+            const plataforma = document.getElementById('mustPlayPlatform').value;
+            const img = document.getElementById('mustPlayImage').value;
+
+            if (titulo && año && desarrolladora && plataforma && img) {
+                mustPlayData.push({ titulo, año, desarrolladora, plataforma, img });
+                localStorage.setItem('mustPlayData', JSON.stringify(mustPlayData));
+                toggleForm('must-play');
+                applyMustPlayFilters();
+            } else {
+                alert('Por favor, completa todos los campos correctamente.');
+            }
+        }
+
+        function tryYourLuck() {
+            if (mustPlayData.length === 0) {
+                alert('No hay juegos Must Play para seleccionar.');
+                return;
+            }
+            const randomGame = mustPlayData[Math.floor(Math.random() * mustPlayData.length)];
+            const luckyGameDiv = document.getElementById('luckyGame');
+            luckyGameDiv.innerHTML = `
+                <div class="must-play-card">
+                    <img src="${randomGame.img}" alt="${randomGame.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${randomGame.titulo}'">
+                    <h3>${randomGame.titulo}</h3>
+                    <p>${randomGame.año} | ${randomGame.plataforma}</p>
+                    <p>Desarrolladora: ${randomGame.desarrolladora}</p>
+                </div>
+            `;
+            luckyGameDiv.classList.add('active');
+        }
+
         function toggleDebug() {
             debugEnabled = !debugEnabled;
             document.body.classList.toggle('debug-active', debugEnabled);
@@ -680,6 +752,5 @@
             }
         }
     </script>
-    <script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" onerror="onGapiError()"></script>
 </body>
 </html>
