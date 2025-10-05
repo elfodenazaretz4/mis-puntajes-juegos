@@ -278,7 +278,6 @@
             </select>
         </div>
         <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
-        <div id="luckyGame" class="lucky-game"></div>
         <div id="loadMoreMustPlay" class="load-more" onclick="loadMoreMustPlayGames()">Cargar más</div>
         <div id="loadAllMustPlay" class="load-all" onclick="loadAllMustPlayGames()">Cargar todo</div>
     </div>
@@ -736,7 +735,10 @@
                 mustPlayOffset = 0;
                 renderedMustPlayGames = [];
                 applyMustPlayFilters();
-                document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
+                // Asegurar que el desplazamiento ocurra después de renderizar
+                setTimeout(() => {
+                    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }, 100); // Pequeño retraso para que el DOM se actualice
             }
         }
 
@@ -761,17 +763,21 @@
             `;
             const start = renderedMustPlayGames.length;
             const end = Math.min(start + PAGE_SIZE, games.length);
-            for (let i = start; i < end; i++) {
-                const game = games[i];
-                html += `
-                    <div class="must-play-card">
-                        <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
-                        <h3>${game.titulo}</h3>
-                        <p>${game.año} | ${game.plataforma}</p>
-                        <p>Desarrolladora: ${game.desarrolladora}</p>
-                    </div>
-                `;
-                renderedMustPlayGames.push(game);
+            if (start === 0 && games.length === 0) {
+                html += '<p>No hay juegos Must Play disponibles.</p>';
+            } else {
+                for (let i = start; i < end; i++) {
+                    const game = games[i];
+                    html += `
+                        <div class="must-play-card">
+                            <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
+                            <h3>${game.titulo}</h3>
+                            <p>${game.año} | ${game.plataforma}</p>
+                            <p>Desarrolladora: ${game.desarrolladora}</p>
+                        </div>
+                    `;
+                    renderedMustPlayGames.push(game);
+                }
             }
             container.innerHTML = html;
             document.getElementById('loadMoreMustPlay').style.display = end < games.length ? 'block' : 'none';
@@ -798,17 +804,21 @@
             const sortOrder = document.getElementById('sortOrder').value;
             let sortedGames = [...mustPlayData];
             sortedGames.sort((a, b) => sortOrder === 'asc' ? a.año - b.año : b.año - a.año);
-            sortedGames.forEach(game => {
-                html += `
-                    <div class="must-play-card">
-                        <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
-                        <h3>${game.titulo}</h3>
-                        <p>${game.año} | ${game.plataforma}</p>
-                        <p>Desarrolladora: ${game.desarrolladora}</p>
-                    </div>
-                `;
-                renderedMustPlayGames.push(game);
-            });
+            if (sortedGames.length === 0) {
+                html += '<p>No hay juegos Must Play disponibles.</p>';
+            } else {
+                sortedGames.forEach(game => {
+                    html += `
+                        <div class="must-play-card">
+                            <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
+                            <h3>${game.titulo}</h3>
+                            <p>${game.año} | ${game.plataforma}</p>
+                            <p>Desarrolladora: ${game.desarrolladora}</p>
+                        </div>
+                    `;
+                    renderedMustPlayGames.push(game);
+                });
+            }
             container.innerHTML = html;
             document.getElementById('loadMoreMustPlay').style.display = 'none';
             document.getElementById('loadAllMustPlay').style.display = 'none';
@@ -863,7 +873,7 @@
             renderedMustPlayGames = [randomGame];
             document.getElementById('loadMoreMustPlay').style.display = 'none';
             document.getElementById('loadAllMustPlay').style.display = 'none';
-            document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
 
         function toggleDebug() {
