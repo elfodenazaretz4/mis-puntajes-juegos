@@ -42,6 +42,10 @@
         .profile-selector button.active {
             background: #444;
         }
+        .profile-selector .must-play-button {
+            background: #C3B1E1; /* Púrpura suave */
+            color: #000;
+        }
         .search-bar {
             margin-bottom: 10px;
             text-align: center;
@@ -178,6 +182,7 @@
             <button onclick="loadProfile('shenqi')">Shenqi</button>
             <button onclick="loadProfile('cayden')">Cayden</button>
             <button onclick="toggleForm('add')">Agregar Juego</button>
+            <button class="must-play-button" onclick="loadMustPlay()">Lista Cronológica Must Play</button>
         </div>
         <div class="search-bar">
             <input type="text" id="searchInput" placeholder="Buscar por título..." onkeyup="applySearch()">
@@ -262,7 +267,6 @@
 
     <button class="sync-button" onclick="syncToClipboard()">Copiar Cambios al Portapapeles</button>
 
-    <button class="sync-button" onclick="loadMustPlay()">Lista Cronológica Must Play</button>
     <div id="mustPlayContainer" class="must-play-grid" style="display:none;">
         <div class="must-play-controls">
             <label>Orden:</label>
@@ -735,6 +739,7 @@
                     <h3>${randomGame.titulo}</h3>
                     <p>${randomGame.año} | ${randomGame.plataforma}</p>
                     <p>Desarrolladora: ${randomGame.desarrolladora}</p>
+                    <p><strong>¡Debes jugar este juego!</strong></p>
                 </div>
             `;
             luckyGameDiv.classList.add('active');
