@@ -674,6 +674,7 @@
             container.style.display = container.style.display === 'none' ? 'block' : 'none';
             if (container.style.display === 'block') {
                 applyMustPlayFilters();
+                document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
             }
         }
 
@@ -739,10 +740,11 @@
                     <h3>${randomGame.titulo}</h3>
                     <p>${randomGame.año} | ${randomGame.plataforma}</p>
                     <p>Desarrolladora: ${randomGame.desarrolladora}</p>
-                    <p><strong>¡Debes jugar este juego!</strong></p>
+                    <p><strong>¡Ahora debes jugar este juego!</strong></p>
                 </div>
             `;
             luckyGameDiv.classList.add('active');
+            document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
         }
 
         function toggleDebug() {
