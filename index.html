@@ -124,7 +124,7 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        .sync-button, .debug-toggle, .auth-button {
+        .sync-button, .debug-toggle, .auth-button, .play-button {
             background: #444;
             color: #fff;
             border: none;
@@ -134,6 +134,7 @@
             margin-top: 10px;
         }
         .auth-button { background: #4CAF50; }
+        .play-button { background: #1DB954; }
         #debug {
             margin-top: 20px;
             color: #ff0;
@@ -143,12 +144,34 @@
             display: block;
         }
         strong { font-weight: bold; }
+        #current-track {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        #spotify-player {
+            width: 100%;
+            height: 352px;
+            margin-bottom: 20px;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <header onclick="loadProfile('main')">
         <h1>Mis Puntajes de Videojuegos</h1>
     </header>
+
+    <!-- Cartelito de Canción Actual -->
+    <div id="current-track">
+        <p id="current-song">Reproduciendo: <strong>Cargando...</strong></p>
+        <p id="current-artist">Artista: <strong>Cargando...</strong></p>
+        <p id="current-progress">Progreso: <strong>0:00 / 0:00</strong></p>
+        <button class="play-button" onclick="playSpotify()">Iniciar Reproducción</button>
+    </div>
 
     <div class="controls">
         <div class="profile-selector">
@@ -180,6 +203,9 @@
     <button class="auth-button" id="authorizeButton" style="display:none;">Autorizar</button>
     <button class="debug-toggle" onclick="toggleDebug()">Mostrar Depuración</button>
     <div id="debug"></div>
+
+    <!-- Reproductor Spotify -->
+    <iframe id="spotify-player" src="https://open.spotify.com/embed/playlist/0TpzNzSzM0jXtaACgGlloQ?theme=0&autoplay=1" width="300" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
 
     <form id="addForm" class="add-form">
         <h3>Agregar Nuevo Juego</h3>
@@ -252,11 +278,86 @@
         let editIndex = -1;
         let debugEnabled = false;
         let gapi = window.gapi;
-        let CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Tu client_id
+        let player;
+        let token;
+
+        // Configuración de Spotify
+        const CLIENT_ID = '02f49566260e4ac192710089339ecbfc';
+        const CLIENT_SECRET = 'f2b6c9dd004e4c00887e12fb10f3f7af';
+
         let API_KEY = 'AIzaSyBlzM9xHLj4b0nZqUR0DkzPbh8RgZyQtBc';
         let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
         let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
         const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg';
+
+        // Obtener token de acceso
+        async function getToken() {
+            const response = await fetch('https://accounts.spotify.com/api/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + btoa(CLIENT_ID + ':' + CLIENT_SECRET)
+                },
+                body: 'grant_type=client_credentials'
+            });
+            const data = await response.json();
+            return data.access_token;
+        }
+
+        // Iniciar reproductor Spotify
+        async function playSpotify() {
+            token = await getToken();
+            const playerElement = document.getElementById('spotify-player');
+            playerElement.style.display = 'block';
+            playerElement.contentWindow.postMessage({
+                command: 'play'
+            }, 'https://open.spotify.com');
+
+            if (window.Spotify) {
+                window.onSpotifyWebPlaybackSDKReady = () => {
+                    player = new Spotify.Player({
+                        name: 'Mis Juegos Player',
+                        getOAuthToken: cb => { cb(token); }
+                    });
+
+                    player.addListener('ready', ({ device_id }) => {
+                        console.log('Dispositivo listo:', device_id);
+                        fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device_id}`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({
+                                context_uri: 'spotify:playlist:0TpzNzSzM0jXtaACgGlloQ'
+                            })
+                        }).catch(err => console.error('Error al reproducir:', err));
+                    });
+
+                    player.addListener('player_state_changed', state => {
+                        if (!state) return;
+                        const track = state.track_window.current_track;
+                        document.getElementById('current-song').textContent = `Reproduciendo: <strong>${track.name}</strong>`;
+                        document.getElementById('current-artist').textContent = `Artista: <strong>${track.artists.map(artist => artist.name).join(', ')}</strong>`;
+                        const progressMs = state.position;
+                        const durationMs = track.duration_ms;
+                        const progressMin = Math.floor(progressMs / 60000);
+                        const progressSec = Math.floor((progressMs % 60000) / 1000);
+                        const durationMin = Math.floor(durationMs / 60000);
+                        const durationSec = Math.floor((durationMs % 60000) / 1000);
+                        document.getElementById('current-progress').textContent = `Progreso: <strong>${progressMin}:${progressSec.toString().padStart(2, '0')} / ${durationMin}:${durationSec.toString().padStart(2, '0')}</strong>`;
+                    });
+
+                    player.connect().then(success => {
+                        if (success) console.log('Conectado al reproductor');
+                    });
+                };
+                const script = document.createElement('script');
+                script.src = 'https://sdk.scdn.co/spotify-player.js';
+                document.body.appendChild(script);
+            } else {
+                document.getElementById('current-song').textContent = 'Reproduciendo: <strong>Lista de Spotify</strong>';
+                document.getElementById('current-artist').textContent = 'Artista: <strong>Cargando...</strong>';
+                document.getElementById('current-progress').textContent = 'Progreso: <strong>0:00 / 0:00</strong>';
+            }
+        }
 
         function onGapiLoad() {
             console.log('gapi cargado correctamente');
@@ -321,7 +422,6 @@
             });
         }
 
-        // Cargar datos desde Google Sheets
         function loadData() {
             const debugDiv = document.getElementById('debug');
             if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos...';
@@ -348,7 +448,7 @@
                                 if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${img}`;
                             }
                         }
-                        localStorage.setItem('gameData', JSON.stringify(data)); // Guardar en localStorage como respaldo
+                        localStorage.setItem('gameData', JSON.stringify(data));
                         if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados desde Google Sheets: ${rows.length - 1} filas procesadas.`;
                         updateDisplay();
                     } else {
@@ -366,7 +466,6 @@
                 });
         }
 
-        // Sincronizar datos con Google Sheets
         function syncToSheets() {
             const debugDiv = document.getElementById('debug');
             if (debugEnabled) debugDiv.innerHTML += '<br>Iniciando sincronización con Google Sheets...';
@@ -384,16 +483,15 @@
             }).then(response => {
                 if (debugEnabled) debugDiv.innerHTML += '<br>Sincronización exitosa.';
                 console.log('Sincronización exitosa:', response);
-                localStorage.setItem('gameData', JSON.stringify(data)); // Actualizar localStorage
+                localStorage.setItem('gameData', JSON.stringify(data));
                 alert('Datos sincronizados con Google Sheets.');
             }, error => {
-                if (debugEnabled) debugDiv.innerHTML += '<br>Error en sincronización: ' + error.result.error.message;
+                if (debugEnabled) debugDiv.innerHTML += '<br>Error en sincronización: ' + error.result.error.message';
                 console.error('Error en sincronización:', error);
                 alert('Error al sincronizar. Revisa la consola o depuración.');
             });
         }
 
-        // Sincronización automática tras cambios
         function autoSync() {
             const authInstance = gapi.auth2.getAuthInstance();
             if (authInstance && authInstance.isSignedIn.get()) {
@@ -403,7 +501,6 @@
             }
         }
 
-        // Actualizar la interfaz
         function updateDisplay() {
             if (currentProfile !== 'main') {
                 allGames = data[currentProfile] || [];
@@ -417,6 +514,7 @@
         window.onload = function() {
             loadData();
             loadProfile('main');
+            playSpotify(); // Intentar reproducir al cargar
         };
 
         function loadProfile(profile) {
@@ -510,7 +608,7 @@
                     if (foundGame) allPuntajes.push({ profile, puntaje: foundGame.puntaje });
                 }
                 const puntajesText = allPuntajes.map(p => `${p.profile}: ${p.puntaje}`).join('<br>');
-                const currentProfilePuntaje = game.puntaje; // Puntaje del perfil actual
+                const currentProfilePuntaje = game.puntaje;
                 const card = document.createElement('div');
                 card.className = 'game-card';
                 card.innerHTML = `
@@ -608,7 +706,7 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('add');
-                autoSync(); // Sincronizar automáticamente
+                autoSync();
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -630,7 +728,7 @@
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
                 toggleForm('edit');
-                autoSync(); // Sincronizar automáticamente
+                autoSync();
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
             }
@@ -641,7 +739,7 @@
                 data[currentProfile].splice(index, 1);
                 localStorage.setItem('gameData', JSON.stringify(data));
                 updateDisplay();
-                autoSync(); // Sincronizar automáticamente
+                autoSync();
             }
         }
 
