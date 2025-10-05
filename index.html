@@ -131,7 +131,7 @@
             cursor: pointer;
             margin: 5px;
         }
-        .sync-button, .auth-button, .debug-toggle {
+        .sync-button, .auth-button, .debug-toggle, .load-more, .load-all {
             background: #444;
             color: #fff;
             border: none;
@@ -231,6 +231,8 @@
     </div>
 
     <div id="mainGamesContainer" class="main-games-grid"></div>
+    <div id="loadMoreMain" class="load-more" onclick="loadMoreMainGames()" style="display:none;">Cargar más</div>
+    <div id="loadAllMain" class="load-all" onclick="loadAllMainGames()" style="display:none;">Cargar todo</div>
     <div id="gamesContainer" class="games-grid"></div>
 
     <form id="editForm" class="edit-form">
@@ -277,6 +279,8 @@
         </div>
         <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
         <div id="luckyGame" class="lucky-game"></div>
+        <div id="loadMoreMustPlay" class="load-more" onclick="loadMoreMustPlayGames()" style="display:none;">Cargar más</div>
+        <div id="loadAllMustPlay" class="load-all" onclick="loadAllMustPlayGames()" style="display:none;">Cargar todo</div>
     </div>
 
     <form id="mustPlayForm" class="must-play-form">
@@ -321,6 +325,9 @@
         let editIndex = -1;
         let debugEnabled = false;
         let mustPlayData = [];
+        let mainGamesOffset = 0;
+        let mustPlayOffset = 0;
+        const PAGE_SIZE = 21;
 
         // Configuración de Google Sheets
         const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Tu clave API
@@ -431,6 +438,7 @@
             if (profile === 'main') {
                 document.getElementById('gamesContainer').style.display = 'none';
                 document.getElementById('mainGamesContainer').style.display = 'flex';
+                mainGamesOffset = 0;
                 renderMainGames();
                 updateFiltersForMain();
             } else {
@@ -562,7 +570,10 @@
 
             const container = document.getElementById('mainGamesContainer');
             container.innerHTML = '';
-            gamesArray.forEach(game => {
+            const start = mainGamesOffset;
+            const end = Math.min(start + PAGE_SIZE, gamesArray.length);
+            for (let i = start; i < end; i++) {
+                const game = gamesArray[i];
                 const puntajesText = game.puntajes.map((p, i) => `${game.profiles[i]}: ${p}`).join('<br>');
                 const promedio = game.puntajes.reduce((sum, p) => sum + p, 0) / game.puntajes.length;
                 const card = document.createElement('div');
@@ -575,11 +586,40 @@
                     <p>Promedio: <strong>${promedio.toFixed(2)}</strong></p>
                 `;
                 container.appendChild(card);
-            });
+            }
+            document.getElementById('loadMoreMain').style.display = end < gamesArray.length ? 'block' : 'none';
+            document.getElementById('loadAllMain').style.display = end < gamesArray.length ? 'block' : 'none';
         }
 
         function renderMainGames() {
+            mainGamesOffset = 0;
             renderMainGamesWithFilter('');
+        }
+
+        function loadMoreMainGames() {
+            mainGamesOffset += PAGE_SIZE;
+            renderMainGamesWithFilter('');
+        }
+
+        function loadAllMainGames() {
+            mainGamesOffset = 0; // Resetear para cargar todo
+            const allGamesData = [];
+            for (let profile in data) {
+                data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+            }
+            const uniqueGames = {};
+            allGamesData.forEach(game => {
+                const key = `${game.titulo}-${game.año}-${game.plataforma}`;
+                if (!uniqueGames[key]) {
+                    uniqueGames[key] = { ...game, puntajes: [], profiles: [] };
+                }
+                uniqueGames[key].puntajes.push(game.puntaje);
+                uniqueGames[key].profiles.push(game.profile);
+            });
+            const gamesArray = Object.values(uniqueGames);
+            renderMainGamesWithFilter('', gamesArray);
+            document.getElementById('loadMoreMain').style.display = 'none';
+            document.getElementById('loadAllMain').style.display = 'none';
         }
 
         function toggleForm(formType, index = -1) {
@@ -673,6 +713,7 @@
             const container = document.getElementById('mustPlayContainer');
             container.style.display = container.style.display === 'none' ? 'block' : 'none';
             if (container.style.display === 'block') {
+                mustPlayOffset = 0;
                 applyMustPlayFilters();
                 document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
             }
@@ -697,7 +738,10 @@
                 </div>
                 <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
             `;
-            games.forEach(game => {
+            const start = mustPlayOffset;
+            const end = Math.min(start + PAGE_SIZE, games.length);
+            for (let i = start; i < end; i++) {
+                const game = games[i];
                 html += `
                     <div class="must-play-card">
                         <img src="${game.img}" alt="${game.titulo}" onerror="this.src='https://via.placeholder.com/200x280/444/fff?text=${game.titulo}'">
@@ -706,8 +750,22 @@
                         <p>Desarrolladora: ${game.desarrolladora}</p>
                     </div>
                 `;
-            });
+            }
             container.innerHTML = html;
+            document.getElementById('loadMoreMustPlay').style.display = end < games.length ? 'block' : 'none';
+            document.getElementById('loadAllMustPlay').style.display = end < games.length ? 'block' : 'none';
+        }
+
+        function loadMoreMustPlayGames() {
+            mustPlayOffset += PAGE_SIZE;
+            applyMustPlayFilters();
+        }
+
+        function loadAllMustPlayGames() {
+            mustPlayOffset = 0; // Resetear para cargar todo
+            renderMustPlayGames(mustPlayData);
+            document.getElementById('loadMoreMustPlay').style.display = 'none';
+            document.getElementById('loadAllMustPlay').style.display = 'none';
         }
 
         function addMustPlayGame() {
@@ -721,6 +779,7 @@
                 mustPlayData.push({ titulo, año, desarrolladora, plataforma, img });
                 localStorage.setItem('mustPlayData', JSON.stringify(mustPlayData));
                 toggleForm('must-play');
+                mustPlayOffset = 0;
                 applyMustPlayFilters();
             } else {
                 alert('Por favor, completa todos los campos correctamente.');
@@ -744,6 +803,9 @@
                 </div>
             `;
             luckyGameDiv.classList.add('active');
+            document.getElementById('mustPlayContainer').innerHTML = luckyGameDiv.outerHTML; // Reemplaza la lista con el juego aleatorio
+            document.getElementById('loadMoreMustPlay').style.display = 'none';
+            document.getElementById('loadAllMustPlay').style.display = 'none';
             document.getElementById('mustPlayContainer').scrollIntoView({ behavior: 'smooth' });
         }
 
