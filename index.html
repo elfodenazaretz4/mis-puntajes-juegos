@@ -255,10 +255,11 @@
         let gapiLoaded = false;
 
         // Configuración de Google Sheets
-        const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Reemplaza con tu clave API
+        const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Tu clave API
+        const CLIENT_ID = '519904327905-mr1hfksujfh218vphe9j9s70e3lh0hff.apps.googleusercontent.com'; // Tu client_id
         const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
         const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
-        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Reemplaza con tu ID de hoja
+        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Tu ID de hoja
 
         // Cargar datos desde Google Sheets
         function loadData() {
@@ -306,18 +307,24 @@
 
         // Inicializar cliente de Google API
         function initClient() {
+            if (!window.gapi) {
+                console.error('gapi no está definido');
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Verifica tu conexión o el script.';
+                return;
+            }
             gapi.load('client:auth2', () => {
                 gapi.client.init({
                     apiKey: API_KEY,
+                    clientId: CLIENT_ID,
                     discoveryDocs: DISCOVERY_DOCS,
                     scope: SCOPES
                 }).then(() => {
                     gapiLoaded = true;
                     const authInstance = gapi.auth2.getAuthInstance();
-                    if (!authInstance.isSignedIn.get()) {
+                    if (authInstance && !authInstance.isSignedIn.get()) {
                         document.getElementById('authorizeButton').style.display = 'block';
                         document.getElementById('authorizeButton').onclick = handleAuthClick;
-                    } else {
+                    } else if (authInstance) {
                         document.getElementById('syncToSheetsButton').disabled = false;
                         loadData();
                     }
@@ -330,14 +337,17 @@
 
         // Manejar autenticación
         function handleAuthClick() {
-            gapi.auth2.getAuthInstance().signIn().then(() => {
-                document.getElementById('authorizeButton').style.display = 'none';
-                document.getElementById('syncToSheetsButton').disabled = false;
-                loadData();
-            }, error => {
-                console.error('Error en autenticación:', error);
-                document.getElementById('debug').innerHTML += '<br>Error en autenticación: ' + error.details;
-            });
+            const authInstance = gapi.auth2.getAuthInstance();
+            if (authInstance) {
+                authInstance.signIn().then(() => {
+                    document.getElementById('authorizeButton').style.display = 'none';
+                    document.getElementById('syncToSheetsButton').disabled = false;
+                    loadData();
+                }, error => {
+                    console.error('Error en autenticación:', error);
+                    document.getElementById('debug').innerHTML += '<br>Error en autenticación: ' + error.details;
+                });
+            }
         }
 
         // Cargar gapi
@@ -347,19 +357,19 @@
                 initClient();
             } else {
                 console.error('gapi no está definido');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido.';
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Verifica tu conexión o el script.';
             }
         }
 
         function onGapiError() {
             console.error('Error al cargar gapi');
-            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi. Verifica tu conexión o la URL del script.';
+            document.getElementById('debug').innerHTML += '<br>Error al cargar gapi. Verifica tu conexión o las credenciales en Google Cloud.';
         }
 
         // Sincronizar con Google Sheets
         function syncToSheets() {
-            if (!gapiLoaded) {
-                alert('gapi no está cargado. Intenta autorizar nuevamente.');
+            if (!gapiLoaded || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                alert('Debes autorizar la aplicación para sincronizar.');
                 return;
             }
             const values = [
@@ -379,16 +389,16 @@
                 alert('Datos sincronizados con Google Sheets.');
             }, error => {
                 console.error('Error en sincronización:', error);
-                alert('Error al sincronizar. Revisa la consola o depuración: ' + error.result.error.message);
+                alert('Error al sincronizar. Revisa la consola o depuración: ' + (error.result ? error.result.error.message : error.message));
             });
         }
 
         // Sincronización automática
         function autoSync() {
-            if (gapiLoaded && gapi.auth2.getAuthInstance().isSignedIn.get()) {
+            if (gapiLoaded && gapi.auth2.getAuthInstance() && gapi.auth2.getAuthInstance().isSignedIn.get()) {
                 syncToSheets();
             } else {
-                alert('Debes autorizar la aplicación para sincronizar.');
+                alert('Debes autorizar la aplicación para sincronizar automáticamente.');
             }
         }
 
