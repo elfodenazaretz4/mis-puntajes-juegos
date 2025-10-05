@@ -305,11 +305,18 @@
                 });
         }
 
-        // Inicializar cliente de Google API
+        // Inicializar cliente de Google API con reintento
         function initClient() {
             if (!window.gapi) {
                 console.error('gapi no está definido');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Verifica tu conexión o el script.';
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Intentando recargar...';
+                setTimeout(() => {
+                    const script = document.createElement('script');
+                    script.src = 'https://apis.google.com/js/api.js';
+                    script.onload = onGapiLoad;
+                    script.onerror = onGapiError;
+                    document.body.appendChild(script);
+                }, 2000); // Reintento después de 2 segundos
                 return;
             }
             gapi.load('client:auth2', () => {
@@ -330,7 +337,7 @@
                     }
                 }, error => {
                     console.error('Error en initClient:', error);
-                    document.getElementById('debug').innerHTML += '<br>Error en initClient: ' + error.details;
+                    document.getElementById('debug').innerHTML += '<br>Error en initClient: ' + JSON.stringify(error);
                 });
             });
         }
@@ -347,6 +354,8 @@
                     console.error('Error en autenticación:', error);
                     document.getElementById('debug').innerHTML += '<br>Error en autenticación: ' + error.details;
                 });
+            } else {
+                document.getElementById('debug').innerHTML += '<br>Error: authInstance no está inicializado.';
             }
         }
 
@@ -356,8 +365,8 @@
                 gapi = window.gapi;
                 initClient();
             } else {
-                console.error('gapi no está definido');
-                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido. Verifica tu conexión o el script.';
+                console.error('gapi no está definido después de recargar');
+                document.getElementById('debug').innerHTML += '<br>Error: gapi no está definido después de recargar. Verifica tu conexión.';
             }
         }
 
