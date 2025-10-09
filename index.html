@@ -278,6 +278,7 @@
             </select>
         </div>
         <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+        <button class="sync-button" onclick="scrollToTop()">Volver arriba</button>
         <div id="loadMoreMustPlay" class="load-more" onclick="loadMoreMustPlayGames()">Cargar más</div>
         <div id="loadAllMustPlay" class="load-all" onclick="loadAllMustPlayGames()">Cargar todo</div>
     </div>
@@ -482,13 +483,16 @@
             const selectedYear = document.getElementById('filterYear').value;
             const selectedPlatform = document.getElementById('filterPlatform').value;
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            let filteredGames;
+
+            let filteredGames = [];
             if (currentProfile !== 'main') {
                 filteredGames = allGames.filter(game => {
                     return (!selectedYear || game.año == selectedYear) &&
                            (!selectedPlatform || game.plataforma === selectedPlatform) &&
                            (!searchTerm || game.titulo.toLowerCase().includes(searchTerm));
                 });
+                filteredGames.sort((a, b) => b.puntaje - a.puntaje);
+                renderGames(filteredGames);
             } else {
                 const allGamesData = [];
                 for (let profile in data) {
@@ -499,22 +503,12 @@
                            (!selectedPlatform || game.plataforma === selectedPlatform) &&
                            (!searchTerm || game.titulo.toLowerCase().includes(searchTerm));
                 });
-            }
-            filteredGames.sort((a, b) => b.puntaje - a.puntaje);
-            if (currentProfile !== 'main') {
-                renderGames(filteredGames);
-            } else {
-                renderMainGamesWithFilter('', filteredGames);
+                renderMainGamesWithFilter(searchTerm, filteredGames);
             }
         }
 
         function applySearch() {
-            if (currentProfile !== 'main') {
-                applyFiltersAndSearch();
-            } else {
-                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-                renderMainGamesWithFilter(searchTerm);
-            }
+            applyFiltersAndSearch();
         }
 
         function renderGames(games) {
@@ -571,7 +565,11 @@
             });
 
             const container = document.getElementById('mainGamesContainer');
-            const start = renderedMainGames.length;
+            if (mainGamesOffset === 0) {
+                container.innerHTML = '';
+                renderedMainGames = [];
+            }
+            const start = mainGamesOffset;
             const end = Math.min(start + PAGE_SIZE, gamesArray.length);
             for (let i = start; i < end; i++) {
                 const game = gamesArray[i];
@@ -589,19 +587,19 @@
                 container.appendChild(card);
                 renderedMainGames.push(game);
             }
+            mainGamesOffset = end;
             document.getElementById('loadMoreMain').style.display = end < gamesArray.length ? 'block' : 'none';
             document.getElementById('loadAllMain').style.display = end < gamesArray.length ? 'block' : 'none';
         }
 
         function renderMainGames() {
+            mainGamesOffset = 0;
             renderedMainGames = [];
-            const container = document.getElementById('mainGamesContainer');
-            container.innerHTML = '';
-            renderMainGamesWithFilter('');
+            applyFiltersAndSearch();
         }
 
         function loadMoreMainGames() {
-            renderMainGamesWithFilter('');
+            applyFiltersAndSearch();
         }
 
         function loadAllMainGames() {
@@ -735,10 +733,14 @@
                 mustPlayOffset = 0;
                 renderedMustPlayGames = [];
                 applyMustPlayFilters();
-                // Asegurar que el desplazamiento ocurra después de renderizar
                 setTimeout(() => {
-                    container.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }, 100); // Pequeño retraso para que el DOM se actualice
+                    const lastCard = container.querySelector('.must-play-card:last-child');
+                    if (lastCard) {
+                        lastCard.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    } else {
+                        container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }
+                }, 100);
             }
         }
 
@@ -760,6 +762,7 @@
                     </select>
                 </div>
                 <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+                <button class="sync-button" onclick="scrollToTop()">Volver arriba</button>
             `;
             const start = renderedMustPlayGames.length;
             const end = Math.min(start + PAGE_SIZE, games.length);
@@ -800,6 +803,7 @@
                     </select>
                 </div>
                 <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+                <button class="sync-button" onclick="scrollToTop()">Volver arriba</button>
             `;
             const sortOrder = document.getElementById('sortOrder').value;
             let sortedGames = [...mustPlayData];
@@ -859,6 +863,7 @@
                     </select>
                 </div>
                 <button class="sync-button" onclick="tryYourLuck()">Proba tu suerte</button>
+                <button class="sync-button" onclick="scrollToTop()">Volver arriba</button>
             `;
             html += `
                 <div class="must-play-card">
@@ -886,6 +891,10 @@
             } else {
                 loadData();
             }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     </script>
 </body>
