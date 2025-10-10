@@ -425,6 +425,7 @@
                 updateFilters();
                 applyFiltersAndSearch();
             } else {
+                updateFiltersForMain();
                 renderMainGames();
             }
         }
@@ -437,19 +438,17 @@
 
         function loadProfile(profile) {
             currentProfile = profile;
-            if (profile === 'main') {
-                document.getElementById('gamesContainer').style.display = 'none';
-                document.getElementById('mainGamesContainer').style.display = 'flex';
-                mainGamesOffset = 0;
-                renderedMainGames = [];
-                renderMainGames();
-                updateFiltersForMain();
-            } else {
-                document.getElementById('mainGamesContainer').style.display = 'none';
-                document.getElementById('gamesContainer').style.display = 'flex';
+            document.getElementById('gamesContainer').style.display = profile === 'main' ? 'none' : 'flex';
+            document.getElementById('mainGamesContainer').style.display = profile === 'main' ? 'flex' : 'none';
+            mainGamesOffset = 0;
+            renderedMainGames = [];
+            if (profile !== 'main') {
                 allGames = data[profile] || [];
                 updateFilters();
                 applyFiltersAndSearch();
+            } else {
+                updateFiltersForMain();
+                renderMainGames();
             }
             const buttons = document.querySelectorAll('.profile-selector button');
             buttons.forEach(btn => btn.classList.remove('active'));
@@ -461,28 +460,33 @@
             const years = allGames.length > 0 ? [...new Set(allGames.map(g => g.año))].sort((a, b) => b - a) : [];
             const platforms = allGames.length > 0 ? [...new Set(allGames.map(g => g.plataforma))].sort() : [];
             const yearSelect = document.getElementById('filterYear');
-            yearSelect.innerHTML = '<option value="">Todos</option>' + (years.length > 0 ? years.map(y => `<option value="${y}">${y}</option>`).join('') : '');
             const platformSelect = document.getElementById('filterPlatform');
-            platformSelect.innerHTML = '<option value="">Todos</option>' + (platforms.length > 0 ? platforms.map(p => `<option value="${p}">${p}</option>`).join('') : '');
+            yearSelect.innerHTML = '<option value="">Todos</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+            platformSelect.innerHTML = '<option value="">Todos</option>' + platforms.map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
         function updateFiltersForMain() {
             const allGamesData = [];
             for (let profile in data) {
-                data[profile].forEach(game => allGamesData.push(game));
+                if (data[profile]) {
+                    data[profile].forEach(game => allGamesData.push(game));
+                }
             }
             const years = allGamesData.length > 0 ? [...new Set(allGamesData.map(g => g.año))].sort((a, b) => b - a) : [];
             const platforms = allGamesData.length > 0 ? [...new Set(allGamesData.map(g => g.plataforma))].sort() : [];
             const yearSelect = document.getElementById('filterYear');
-            yearSelect.innerHTML = '<option value="">Todos</option>' + (years.length > 0 ? years.map(y => `<option value="${y}">${y}</option>`).join('') : '');
             const platformSelect = document.getElementById('filterPlatform');
-            platformSelect.innerHTML = '<option value="">Todos</option>' + (platforms.length > 0 ? platforms.map(p => `<option value="${p}">${p}</option>`).join('') : '');
+            yearSelect.innerHTML = '<option value="">Todos</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+            platformSelect.innerHTML = '<option value="">Todos</option>' + platforms.map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
         function applyFiltersAndSearch() {
             const selectedYear = document.getElementById('filterYear').value;
             const selectedPlatform = document.getElementById('filterPlatform').value;
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            mainGamesOffset = 0; // Reiniciar offset para nuevos filtros
+            renderedMainGames = [];
 
             let filteredGames = [];
             if (currentProfile !== 'main') {
@@ -496,7 +500,9 @@
             } else {
                 const allGamesData = [];
                 for (let profile in data) {
-                    data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                    if (data[profile]) {
+                        data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                    }
                 }
                 filteredGames = allGamesData.filter(game => {
                     return (!selectedYear || game.año == selectedYear) &&
@@ -542,7 +548,9 @@
             const allGamesData = filteredGames || [];
             if (!filteredGames) {
                 for (let profile in data) {
-                    data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                    if (data[profile]) {
+                        data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                    }
                 }
             }
             const uniqueGames = {};
@@ -603,13 +611,24 @@
         }
 
         function loadAllMainGames() {
-            renderedMainGames = [];
+            const selectedYear = document.getElementById('filterYear').value;
+            const selectedPlatform = document.getElementById('filterPlatform').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
             const allGamesData = [];
             for (let profile in data) {
-                data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                if (data[profile]) {
+                    data[profile].forEach(game => allGamesData.push({ ...game, profile }));
+                }
             }
+            const filteredGames = allGamesData.filter(game => {
+                return (!selectedYear || game.año == selectedYear) &&
+                       (!selectedPlatform || game.plataforma === selectedPlatform) &&
+                       (!searchTerm || game.titulo.toLowerCase().includes(searchTerm));
+            });
+
             const uniqueGames = {};
-            allGamesData.forEach(game => {
+            filteredGames.forEach(game => {
                 const key = `${game.titulo}-${game.año}-${game.plataforma}`;
                 if (!uniqueGames[key]) {
                     uniqueGames[key] = { ...game, puntajes: [], profiles: [] };
@@ -617,9 +636,17 @@
                 uniqueGames[key].puntajes.push(game.puntaje);
                 uniqueGames[key].profiles.push(game.profile);
             });
+
             const gamesArray = Object.values(uniqueGames);
+            gamesArray.sort((a, b) => {
+                const avgA = a.puntajes.reduce((sum, p) => sum + p, 0) / a.puntajes.length;
+                const avgB = b.puntajes.reduce((sum, p) => sum + p, 0) / b.puntajes.length;
+                return avgB - avgA;
+            });
+
             const container = document.getElementById('mainGamesContainer');
             container.innerHTML = '';
+            renderedMainGames = [];
             gamesArray.forEach(game => {
                 const puntajesText = game.puntajes.map((p, i) => `${game.profiles[i]}: ${p}`).join('<br>');
                 const promedio = game.puntajes.reduce((sum, p) => sum + p, 0) / game.puntajes.length;
@@ -635,6 +662,7 @@
                 container.appendChild(card);
                 renderedMainGames.push(game);
             });
+            mainGamesOffset = gamesArray.length;
             document.getElementById('loadMoreMain').style.display = 'none';
             document.getElementById('loadAllMain').style.display = 'none';
         }
@@ -820,7 +848,7 @@
                             <p>Desarrolladora: ${game.desarrolladora}</p>
                         </div>
                     `;
-                    renderedMustPlayGames.push(game);
+                    renderedMainGames.push(game);
                 });
             }
             container.innerHTML = html;
