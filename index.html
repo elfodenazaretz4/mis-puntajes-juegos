@@ -356,7 +356,8 @@
                     if (rows && rows.length > 1) {
                         data = { z4: [], shenqi: [], cayden: [] };
                         for (let i = 1; i < rows.length; i++) {
-                            const [perfil, titulo, año, plataforma, puntaje, genero, img] = rows[i] || [];
+                            const row = rows[i] || [];
+                            const [perfil, titulo, año, plataforma, puntaje, genero, img] = row;
                             if (perfil && titulo && año && plataforma && puntaje && genero && img) {
                                 data[perfil.toLowerCase()].push({
                                     titulo: titulo,
@@ -367,9 +368,11 @@
                                     img: img
                                 });
                                 if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} procesada: ${perfil}, ${titulo}, ${año}, ${plataforma}, ${puntaje}, ${genero}, ${img}`;
+                            } else {
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila ${i + 1} ignorada: Datos incompletos - ${row}`;
                             }
                         }
-                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados: ${rows.length - 1} filas procesadas.`;
+                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos cargados: ${Object.values(data).flat().length} filas procesadas.`;
                         updateDisplay();
                     } else {
                         if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en la hoja.';
@@ -390,7 +393,7 @@
         function loadMustPlayData() {
             const debugDiv = document.getElementById('debug');
             if (debugEnabled) debugDiv.innerHTML += '<br>Cargando datos Must Play...';
-            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/G:K?key=${API_KEY}`)
+            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/J:N?key=${API_KEY}`)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return response.json();
@@ -401,7 +404,8 @@
                     if (rows && rows.length > 1) {
                         mustPlayData = [];
                         for (let i = 1; i < rows.length; i++) {
-                            const [titulo, año, desarrolladora, plataforma, img] = rows[i] || [];
+                            const row = rows[i] || [];
+                            const [titulo, año, desarrolladora, plataforma, img] = row;
                             if (titulo && año && desarrolladora && plataforma && img) {
                                 mustPlayData.push({
                                     titulo: titulo,
@@ -411,9 +415,11 @@
                                     img: img
                                 });
                                 if (debugEnabled) debugDiv.innerHTML += `<br>Fila Must Play ${i + 1} procesada: ${titulo}, ${año}, ${desarrolladora}, ${plataforma}, ${img}`;
+                            } else {
+                                if (debugEnabled) debugDiv.innerHTML += `<br>Fila Must Play ${i + 1} ignorada: Datos incompletos - ${row}`;
                             }
                         }
-                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos Must Play cargados: ${rows.length - 1} filas procesadas.`;
+                        if (debugEnabled) debugDiv.innerHTML += `<br>Datos Must Play cargados: ${mustPlayData.length} filas procesadas.`;
                         applyMustPlayFilters();
                     } else {
                         if (debugEnabled) debugDiv.innerHTML += '<br>No se encontraron datos válidos en Must Play.';
