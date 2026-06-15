@@ -180,7 +180,7 @@
         <div class="profile-selector">
             <button onclick="loadProfile('z4')">Z4</button>
             <button onclick="loadProfile('shenqi')">Shenqi</button>
-            <button onclick="loadProfile('cayden')">Cayden</button>
+            <button onclick="loadProfile('vaelor')">Vaelor</button>
             <button onclick="toggleForm('add')">Agregar Juego</button>
             <button class="must-play-button" onclick="loadMustPlay()">Lista Cronológica Must Play</button>
         </div>
@@ -354,7 +354,7 @@
                     const rows = dataResponse.values;
                     if (debugEnabled) debugDiv.innerHTML += '<br>Respuesta recibida: ' + JSON.stringify(rows);
                     if (rows && rows.length > 1) {
-                        data = { z4: [], shenqi: [], cayden: [] };
+                        data = { z4: [], shenqi: [], vaelor: [] };
                         for (let i = 1; i < rows.length; i++) {
                             const row = rows[i] || [];
                             const [perfil, titulo, año, plataforma, puntaje, genero, img] = row;
