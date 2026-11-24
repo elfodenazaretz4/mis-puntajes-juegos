@@ -1,0 +1,160 @@
+body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        header h1:hover {
+            color: #ccc;
+        }
+        .controls {
+            position: sticky;
+            top: 20px;
+            background: #000;
+            z-index: 1000;
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+        .profile-selector {
+            margin-bottom: 10px;
+        }
+        .profile-selector button {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .profile-selector button.active {
+            background: #444;
+        }
+        .profile-selector .must-play-button {
+            background: #C3B1E1; /* Púrpura suave */
+            color: #000;
+        }
+        .search-bar {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .search-bar input {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+        .filters {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .filters select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+        .games-grid, .main-games-grid, .must-play-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .game-card, .main-game-card, .must-play-card {
+            background: #222;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px;
+            width: 200px;
+            display: inline-block;
+            vertical-align: top;
+            position: relative;
+        }
+        .game-card img, .main-game-card img, .must-play-card img {
+            width: 100%;
+            border-radius: 5px;
+        }
+        .game-card button {
+            background: #600;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        .game-card .edit-btn { background: #060; }
+        h3 { margin: 10px 0 5px 0; }
+        p { margin: 5px 0; font-size: 0.9em; }
+        .add-form, .edit-form, .must-play-form {
+            background: #222;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px auto;
+            max-width: 500px;
+            display: none;
+        }
+        .add-form.active, .edit-form.active, .must-play-form.active {
+            display: block;
+        }
+        .add-form input, .add-form select, .edit-form input, .edit-form select, .must-play-form input, .must-play-form select {
+            background: #333;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .add-form button, .edit-form button, .must-play-form button {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .sync-button, .auth-button, .debug-toggle, .load-more, .load-all {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .load-more, .load-all {
+            text-align: center;
+        }
+        .auth-button { background: #4CAF50; }
+        #debug {
+            margin-top: 20px;
+            color: #ff0;
+            display: none;
+        }
+        .debug-active #debug {
+            display: block;
+        }
+        .must-play-controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .must-play-controls select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
