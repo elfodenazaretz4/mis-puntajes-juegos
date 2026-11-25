@@ -76,9 +76,19 @@
             localStorage.setItem('mustPlayData', JSON.stringify(mustPlayData));
         }
 
-        // ===== Carga de datos (Google Sheets) =====
-        function loadData() {
-            debugLog('Cargando datos...');
+        // ===== Carga de datos =====
+        // Regla: si ya hay copia guardada en el navegador, se usa esa (así se conservan
+        // las ediciones). Google Sheets se descarga solo si no hay copia o si se fuerza
+        // con el botón "Recargar desde Google Sheets".
+        function loadData(force = false) {
+            const saved = localStorage.getItem('gameData');
+            if (!force && saved) {
+                data = JSON.parse(saved);
+                debugLog('Datos cargados desde la copia guardada en este navegador.');
+                updateDisplay();
+                return;
+            }
+            debugLog('Cargando datos desde Google Sheets...');
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:G?key=${API_KEY}`)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -119,16 +129,22 @@
                 .catch(error => {
                     debugLog(`Error al cargar datos: ${error.message}`);
                     console.error('Error details:', error);
-                    const savedData = localStorage.getItem('gameData');
-                    if (savedData) {
-                        data = JSON.parse(savedData);
+                    if (saved) {
+                        data = JSON.parse(saved);
                         updateDisplay();
                     }
                 });
         }
 
-        function loadMustPlayData() {
-            debugLog('Cargando datos Must Play...');
+        function loadMustPlayData(force = false) {
+            const saved = localStorage.getItem('mustPlayData');
+            if (!force && saved) {
+                mustPlayData = JSON.parse(saved);
+                debugLog('Must Play cargado desde la copia guardada en este navegador.');
+                if (mustPlayVisible()) applyMustPlayFilters();
+                return;
+            }
+            debugLog('Cargando datos Must Play desde Google Sheets...');
             fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/J:N?key=${API_KEY}`)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -166,9 +182,8 @@
                 .catch(error => {
                     debugLog(`Error al cargar datos Must Play: ${error.message}`);
                     console.error('Error details:', error);
-                    const savedMustPlay = localStorage.getItem('mustPlayData');
-                    if (savedMustPlay) {
-                        mustPlayData = JSON.parse(savedMustPlay);
+                    if (saved) {
+                        mustPlayData = JSON.parse(saved);
                         if (mustPlayVisible()) applyMustPlayFilters();
                     }
                 });
@@ -422,6 +437,13 @@
             }
         }
 
+        // ===== Recarga manual desde Google Sheets (descarta cambios locales) =====
+        function reloadFromSheets() {
+            if (!confirm('Esto reemplazará los cambios guardados en este navegador por los datos de Google Sheets. ¿Continuar?')) return;
+            loadData(true);
+            loadMustPlayData(true);
+        }
+
         // ===== Exportar CSV (escapa comas y comillas) =====
         function csvCell(value) {
             const text = String(value ?? '');
@@ -453,7 +475,7 @@
             const show = !mustPlayVisible();
             container.style.display = show ? 'block' : 'none';
             if (!show) return;
-            loadMustPlayData();
+            loadMustPlayData(false);
             applyMustPlayFilters();
             setTimeout(() => {
                 const last = document.querySelector('#mustPlayList .must-play-card:last-child');
