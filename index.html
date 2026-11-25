@@ -100,6 +100,15 @@
     <button class="debug-toggle" onclick="toggleDebug()">Mostrar Depuración</button>
     <div id="debug"></div>
 
+    <div id="youtubePlayer"></div>
+
+    <div id="musicPlayer">
+        <button id="musicPlayBtn" onclick="toggleMusic()">▶</button>
+        <span id="musicNowPlaying">🎵 Música de fondo</span>
+        <input type="range" id="musicVolume" min="0" max="100" value="40" oninput="setMusicVolume(this.value)" title="Volumen">
+        <button onclick="nextSong()" title="Siguiente canción">⏭</button>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

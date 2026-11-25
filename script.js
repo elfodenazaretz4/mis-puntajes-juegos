@@ -526,3 +526,100 @@
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
+        // ===== Reproductor de música (YouTube) =====
+        const VIDEO_IDS = [
+            'BdnX6d1yt14', 'a925dm5smWU', 'Gjht7acg9d4', 'sslj06K-Nlw',
+            '4vXArJnemSA', 'VwbR6LbykP0', 'NP4sPRIyHKM', 'yDv6qdiw_WE',
+            'eX6GmN4usKY', 'gzbLODUb1sA', '9EhWCAHBbjU', 'Iof5pRAIZmw',
+            'ZwLvcaDMhU8', 'j9Sn1nFGQQ8', 'Qwya6SEVR9o', 'piJG3oOXKVo',
+            '4Df5V40-VYI', 'Xpkc-NU1KA0', 'fs2r55kkobQ', 'ncg72VswyTs',
+            'vaLfdU74QgA', 'b83lb24DBzc', 'uxfLDN2bKQY', 'nP00DhUvTqM',
+            '69Km895ntNc', 'zO9IiNgsiMU', 'z1aXXX_oqP8', 'lXMguMnsyak',
+            '8w4nvCAx45s', 'XEeuBxkMSDY', 'kpnW68Q8ltc', 'LTWGR-vLLJA',
+            's2UvXDdmzzw', 'EPhfbtjqWM8', 't-0mhtjEATE', 'BXo3DrXHY8w',
+            'AF22vaGLziM', '7PGLTtKQ_QU', 'lvsxfgABQss', 'roqkaqOuNZE',
+            'AKV6POjDSII', 'FjyDZzh9nsc', 'AdRyMSANpIQ', 'zDAOjbJE1pk',
+            'UzxkPOxcKiA', '1y6B1_-4Fhg', 'u9xSFk1ZDgw', 'EDK9jsQ5itA',
+            's0krxH0dWhU', 'pwHP2bDhkeo'
+        ];
+        let player = null;
+        let musicIndex = 0;
+        let musicPlaying = false;
+        let shuffledIds = [];
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // Cargar la API de YouTube después de que el usuario haga clic en reproducir
+        function initMusic() {
+            if (player) return;
+            shuffledIds = shuffleArray([...VIDEO_IDS]);
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
+        }
+
+        // Callback global que llama la API de YouTube
+        window.onYouTubeIframeAPIReady = function () {
+            player = new YT.Player('youtubePlayer', {
+                height: '0', width: '0',
+                videoId: shuffledIds[0],
+                playerVars: {
+                    autoplay: 0, controls: 0, disablekb: 1,
+                    enablejsapi: 1, fs: 0, modestbranding: 1, rel: 0
+                },
+                events: {
+                    onReady: function () {
+                        player.setVolume(document.getElementById('musicVolume').value);
+                        player.playVideo();
+                        musicPlaying = true;
+                        document.getElementById('musicPlayBtn').textContent = '⏸';
+                        updateMusicLabel();
+                    },
+                    onStateChange: function (e) {
+                        if (e.data === YT.PlayerState.ENDED) nextSong();
+                    }
+                }
+            });
+        };
+
+        function toggleMusic() {
+            if (!player) {
+                initMusic();
+                return;
+            }
+            if (musicPlaying) {
+                player.pauseVideo();
+                musicPlaying = false;
+                document.getElementById('musicPlayBtn').textContent = '▶';
+            } else {
+                player.playVideo();
+                musicPlaying = true;
+                document.getElementById('musicPlayBtn').textContent = '⏸';
+            }
+        }
+
+        function nextSong() {
+            if (!player) return;
+            musicIndex = (musicIndex + 1) % shuffledIds.length;
+            player.loadVideoById(shuffledIds[musicIndex]);
+            player.playVideo();
+            musicPlaying = true;
+            document.getElementById('musicPlayBtn').textContent = '⏸';
+            updateMusicLabel();
+        }
+
+        function setMusicVolume(value) {
+            if (player) player.setVolume(value);
+        }
+
+        function updateMusicLabel() {
+            document.getElementById('musicNowPlaying').textContent =
+                `🎵 Canción ${musicIndex + 1} de ${shuffledIds.length}`;
+        }
