@@ -1,8 +1,17 @@
 // ===== Configuración =====
-        const API_KEY = 'AIzaSyCN2mcDPn_rq4YQU2t5aQFFLhAhQGoYc9E'; // Tu clave API
-        const SPREADSHEET_ID = '1gauIcXDfqgYTGHGSTojlULZc6LPTQMTRpX-9Lqfm8pg'; // Tu ID de hoja
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyri11I8noRSb6ZPIKaZ4oAPxvwbaXTdTeUtHlZCD6_HGyIBw6siouScl0uXkrEGwBFng/exec';
+        const SECRET_KEY = 'pr_key_2025'; // Debe coincidir con SECRET_KEY en Code.gs
         const PROFILES = ['z4', 'shenqi', 'vaelor'];
-        const PLATFORMS = ['PC', 'Wii', 'Switch', 'PS3', 'PS4', 'PS5', 'Xbox', 'Xbox 360', 'Xbox One', 'Xbox Series X', 'GameCube', 'NES', 'SNES', 'N64', 'Game Boy', 'DS', '3DS', 'PSP', 'Vita'];
+        const PLATFORMS = [
+            'PC',
+            'NES', 'SNES', 'N64', 'GameCube', 'Wii', 'Wii U', 'Switch',
+            'Game Boy', 'Game Boy Color', 'Game Boy Advance', 'DS', '3DS', 'Virtual Boy',
+            'PS1', 'PS2', 'PS3', 'PS4', 'PS5', 'PSP', 'Vita',
+            'Xbox', 'Xbox 360', 'Xbox One', 'Xbox Series X',
+            'SEGA Master System', 'SEGA Genesis', 'SEGA Saturn', 'SEGA Dreamcast', 'Game Gear',
+            'Atari 2600', 'Arcade', 'PC Engine', 'Neo Geo', 'Commodore 64', 'Web',
+            'Celular'
+        ];
         const PAGE_SIZE = 21;
         const PLACEHOLDER_URL = 'https://placehold.co/200x280/444/fff?text=';
         const MSG_INCOMPLETE = 'Por favor, completa todos los campos correctamente.';
@@ -76,116 +85,74 @@
             localStorage.setItem('mustPlayData', JSON.stringify(mustPlayData));
         }
 
-        // ===== Carga de datos =====
-        // Regla: si ya hay copia guardada en el navegador, se usa esa (así se conservan
-        // las ediciones). Google Sheets se descarga solo si no hay copia o si se fuerza
-        // con el botón "Recargar desde Google Sheets".
-        function loadData(force = false) {
-            const saved = localStorage.getItem('gameData');
-            if (!force && saved) {
-                data = JSON.parse(saved);
-                debugLog('Datos cargados desde la copia guardada en este navegador.');
-                updateDisplay();
-                return;
-            }
+        // ===== Carga de datos (Google Apps Script <-> Google Sheets) =====
+        // La hoja es la fuente de verdad. La copia en localStorage solo se usa si no hay conexión.
+        function loadData() {
             debugLog('Cargando datos desde Google Sheets...');
-            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A:G?key=${API_KEY}`)
+            fetch(SCRIPT_URL)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return response.json();
                 })
-                .then(dataResponse => {
-                    const rows = dataResponse.values;
-                    debugLog('Respuesta recibida: ' + JSON.stringify(rows));
-                    if (!rows || rows.length < 2) {
-                        debugLog('No se encontraron datos válidos en la hoja.');
-                        return;
-                    }
+                .then(json => {
+                    if (!json.ok) throw new Error(json.error);
                     const nuevos = {};
                     PROFILES.forEach(p => nuevos[p] = []);
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i] || [];
-                        const [perfil, titulo, año, plataforma, puntaje, genero, img] = row;
-                        const clave = (perfil || '').trim().toLowerCase();
-                        if (PROFILES.includes(clave) && titulo && año && plataforma && puntaje && genero && img) {
-                            nuevos[clave].push({
-                                titulo: titulo,
-                                año: parseInt(año),
-                                plataforma: plataforma,
-                                puntaje: parseFloat(puntaje),
-                                genero: genero,
-                                img: img
+                    json.data.games.forEach(g => {
+                        if (nuevos[g.perfil]) {
+                            nuevos[g.perfil].push({
+                                titulo: g.titulo,
+                                año: g.año,
+                                plataforma: g.plataforma,
+                                puntaje: g.puntaje,
+                                genero: g.genero,
+                                img: g.img,
+                                _row: g._row
                             });
-                            debugLog(`Fila ${i + 1} procesada: ${row.join(', ')}`);
-                        } else {
-                            debugLog(`Fila ${i + 1} ignorada (datos incompletos o perfil desconocido): ${row.join(', ')}`);
                         }
-                    }
+                    });
                     data = nuevos;
+                    mustPlayData = json.data.mustPlay.map(m => ({
+                        titulo: m.titulo,
+                        año: m.año,
+                        desarrolladora: m.desarrolladora,
+                        plataforma: m.plataforma,
+                        img: m.img,
+                        _row: m._row
+                    }));
                     saveLocal();
-                    debugLog(`Datos cargados: ${Object.values(data).flat().length} filas procesadas.`);
+                    saveLocalMustPlay();
+                    debugLog(`Datos cargados: ${json.data.games.length} juegos y ${mustPlayData.length} Must Play.`);
                     updateDisplay();
+                    if (mustPlayVisible()) applyMustPlayFilters();
                 })
                 .catch(error => {
                     debugLog(`Error al cargar datos: ${error.message}`);
                     console.error('Error details:', error);
-                    if (saved) {
-                        data = JSON.parse(saved);
+                    const savedData = localStorage.getItem('gameData');
+                    if (savedData) {
+                        data = JSON.parse(savedData);
                         updateDisplay();
+                    }
+                    const savedMustPlay = localStorage.getItem('mustPlayData');
+                    if (savedMustPlay) {
+                        mustPlayData = JSON.parse(savedMustPlay);
+                        if (mustPlayVisible()) applyMustPlayFilters();
                     }
                 });
         }
 
-        function loadMustPlayData(force = false) {
-            const saved = localStorage.getItem('mustPlayData');
-            if (!force && saved) {
-                mustPlayData = JSON.parse(saved);
-                debugLog('Must Play cargado desde la copia guardada en este navegador.');
-                if (mustPlayVisible()) applyMustPlayFilters();
-                return;
-            }
-            debugLog('Cargando datos Must Play desde Google Sheets...');
-            fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/J:N?key=${API_KEY}`)
-                .then(response => {
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return response.json();
-                })
-                .then(dataResponse => {
-                    const rows = dataResponse.values;
-                    debugLog('Respuesta Must Play recibida: ' + JSON.stringify(rows));
-                    if (!rows || rows.length < 2) {
-                        debugLog('No se encontraron datos válidos en Must Play.');
-                        return;
-                    }
-                    const nuevos = [];
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i] || [];
-                        const [titulo, año, desarrolladora, plataforma, img] = row;
-                        if (titulo && año && desarrolladora && plataforma && img) {
-                            nuevos.push({
-                                titulo: titulo,
-                                año: parseInt(año),
-                                desarrolladora: desarrolladora,
-                                plataforma: plataforma,
-                                img: img
-                            });
-                            debugLog(`Fila Must Play ${i + 1} procesada: ${row.join(', ')}`);
-                        } else {
-                            debugLog(`Fila Must Play ${i + 1} ignorada (datos incompletos): ${row.join(', ')}`);
-                        }
-                    }
-                    mustPlayData = nuevos;
-                    saveLocalMustPlay();
-                    debugLog(`Datos Must Play cargados: ${mustPlayData.length} filas procesadas.`);
-                    if (mustPlayVisible()) applyMustPlayFilters();
-                })
-                .catch(error => {
-                    debugLog(`Error al cargar datos Must Play: ${error.message}`);
-                    console.error('Error details:', error);
-                    if (saved) {
-                        mustPlayData = JSON.parse(saved);
-                        if (mustPlayVisible()) applyMustPlayFilters();
-                    }
+        // Envía un cambio al Apps Script, que lo escribe en la hoja. Se resuelve solo si la hoja se actualizó.
+        // Se envía como text/plain para evitar el preflight de CORS que Apps Script no soporta.
+        function sendToSheets(action, payload, row) {
+            return fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ key: SECRET_KEY, action: action, data: payload, row: row })
+            })
+                .then(response => response.json())
+                .then(json => {
+                    if (!json.ok) throw new Error(json.error);
+                    return json;
                 });
         }
 
@@ -400,11 +367,9 @@
             const img = document.getElementById('gameImage').value.trim();
 
             if (titulo && año && plataforma && genero && !isNaN(puntaje) && img) {
-                if (!data[currentProfile]) data[currentProfile] = [];
-                data[currentProfile].push({ titulo, año, plataforma, genero, puntaje, img });
-                saveLocal();
-                hideForms();
-                updateDisplay();
+                sendToSheets('addGame', { perfil: currentProfile, titulo, año, plataforma, genero, puntaje, img })
+                    .then(() => { hideForms(); loadData(); })
+                    .catch(err => alert('No se pudo guardar en Google Sheets: ' + err.message));
             } else {
                 alert(MSG_INCOMPLETE);
             }
@@ -419,11 +384,10 @@
             const img = document.getElementById('editGameImage').value.trim();
 
             if (titulo && año && plataforma && genero && !isNaN(puntaje) && img && editIndex >= 0) {
-                data[currentProfile][editIndex] = { titulo, año, plataforma, genero, puntaje, img };
-                saveLocal();
-                editIndex = -1;
-                hideForms();
-                updateDisplay();
+                const row = data[currentProfile][editIndex]._row;
+                sendToSheets('editGame', { perfil: currentProfile, titulo, año, plataforma, genero, puntaje, img }, row)
+                    .then(() => { editIndex = -1; hideForms(); loadData(); })
+                    .catch(err => alert('No se pudo guardar en Google Sheets: ' + err.message));
             } else {
                 alert(MSG_INCOMPLETE);
             }
@@ -431,17 +395,16 @@
 
         function deleteGame(index) {
             if (confirm('¿Estás seguro de eliminar este juego?')) {
-                data[currentProfile].splice(index, 1);
-                saveLocal();
-                updateDisplay();
+                const row = data[currentProfile][index]._row;
+                sendToSheets('deleteGame', {}, row)
+                    .then(() => loadData())
+                    .catch(err => alert('No se pudo eliminar en Google Sheets: ' + err.message));
             }
         }
 
         // ===== Recarga manual desde Google Sheets (descarta cambios locales) =====
         function reloadFromSheets() {
-            if (!confirm('Esto reemplazará los cambios guardados en este navegador por los datos de Google Sheets. ¿Continuar?')) return;
-            loadData(true);
-            loadMustPlayData(true);
+            loadData();
         }
 
         // ===== Exportar CSV (escapa comas y comillas) =====
@@ -475,7 +438,6 @@
             const show = !mustPlayVisible();
             container.style.display = show ? 'block' : 'none';
             if (!show) return;
-            loadMustPlayData(false);
             applyMustPlayFilters();
             setTimeout(() => {
                 const last = document.querySelector('#mustPlayList .must-play-card:last-child');
@@ -537,10 +499,9 @@
             const img = document.getElementById('mustPlayImage').value.trim();
 
             if (titulo && año && desarrolladora && plataforma && img) {
-                mustPlayData.push({ titulo, año, desarrolladora, plataforma, img });
-                saveLocalMustPlay();
-                hideForms();
-                applyMustPlayFilters();
+                sendToSheets('addMustPlayGame', { titulo, año, desarrolladora, plataforma, img })
+                    .then(() => { hideForms(); loadData(); })
+                    .catch(err => alert('No se pudo guardar en Google Sheets: ' + err.message));
             } else {
                 alert(MSG_INCOMPLETE);
             }
