@@ -546,6 +546,7 @@
         let player = null;
         let musicIndex = 0;
         let musicPlaying = false;
+        let musicLoading = false;
         let shuffledIds = [];
 
         function shuffleArray(arr) {
@@ -558,35 +559,49 @@
 
         // Cargar la API de YouTube después de que el usuario haga clic en reproducir
         function initMusic() {
-            if (player) return;
+            if (player || musicLoading) return;
+            musicLoading = true;
+            document.getElementById('musicPlayBtn').textContent = '⏳';
             shuffledIds = shuffleArray([...VIDEO_IDS]);
             const tag = document.createElement('script');
             tag.src = 'https://www.youtube.com/iframe_api';
+            tag.onerror = function () {
+                document.getElementById('musicPlayBtn').textContent = '⚠';
+                musicLoading = false;
+                console.error('No se pudo cargar la API de YouTube');
+            };
             document.head.appendChild(tag);
         }
 
         // Callback global que llama la API de YouTube
         window.onYouTubeIframeAPIReady = function () {
-            player = new YT.Player('youtubePlayer', {
-                height: '0', width: '0',
-                videoId: shuffledIds[0],
-                playerVars: {
-                    autoplay: 0, controls: 0, disablekb: 1,
-                    enablejsapi: 1, fs: 0, modestbranding: 1, rel: 0
-                },
-                events: {
-                    onReady: function () {
-                        player.setVolume(document.getElementById('musicVolume').value);
-                        player.playVideo();
-                        musicPlaying = true;
-                        document.getElementById('musicPlayBtn').textContent = '⏸';
-                        updateMusicLabel();
+            try {
+                player = new YT.Player('youtubePlayer', {
+                    height: '1', width: '1',
+                    videoId: shuffledIds[0],
+                    playerVars: {
+                        autoplay: 0, controls: 0, disablekb: 1,
+                        enablejsapi: 1, fs: 0, modestbranding: 1, rel: 0
                     },
-                    onStateChange: function (e) {
-                        if (e.data === YT.PlayerState.ENDED) nextSong();
+                    events: {
+                        onReady: function () {
+                            player.setVolume(document.getElementById('musicVolume').value);
+                            player.playVideo();
+                            musicPlaying = true;
+                            musicLoading = false;
+                            document.getElementById('musicPlayBtn').textContent = '⏸';
+                            updateMusicLabel();
+                        },
+                        onStateChange: function (e) {
+                            if (e.data === YT.PlayerState.ENDED) nextSong();
+                        }
                     }
-                }
-            });
+                });
+            } catch (e) {
+                console.error('Error al crear reproductor YouTube:', e);
+                musicLoading = false;
+                document.getElementById('musicPlayBtn').textContent = '▶';
+            }
         };
 
         function toggleMusic() {
